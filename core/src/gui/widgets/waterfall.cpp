@@ -1007,8 +1007,9 @@ namespace ImGui {
     }
 
     void WaterFall::setZoom(double zoomLevel) {
-        viewZoom = zoomLevel;
-        double factor = zoomLevel * zoomLevel;
+        zoomLevel = std::clamp(zoomLevel, 0.0, 1.0);
+
+        double factor = zoomLevel * zoomLevel * zoomLevel;
 
         // Map 0.0 -> 1.0 to 1000.0 -> bandwidth
         double wfBw = getBandwidth();
@@ -1025,7 +1026,7 @@ namespace ImGui {
     double WaterFall::calculateZoomLevelFromBw(double bw) {
         double wfBw = getBandwidth();
         double onCurve = (bw - 1000.0) / (wfBw - 1000.0);
-        double zoomLevel = std::sqrt(onCurve);
+        double zoomLevel = std::cbrt(onCurve);
         return zoomLevel;
     }
 
