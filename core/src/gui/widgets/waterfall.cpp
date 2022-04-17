@@ -346,88 +346,20 @@ namespace ImGui {
             double deltax = drag.x - lastDrag;
             lastDrag = drag.x;
             double viewDelta = deltax * (viewBandwidth / (double)dataWidth);
-
-            viewOffset -= viewDelta;
-
-            if (viewOffset + (viewBandwidth / 2.0) > wholeBandwidth / 2.0) {
-                double freqOffset = (viewOffset + (viewBandwidth / 2.0)) - (wholeBandwidth / 2.0);
-                viewOffset = (wholeBandwidth / 2.0) - (viewBandwidth / 2.0);
-                if (!centerFrequencyLocked) {
-                    centerFreq += freqOffset;
-                    centerFreqMoved = true;
-                }
-            }
-            if (viewOffset - (viewBandwidth / 2.0) < -(wholeBandwidth / 2.0)) {
-                double freqOffset = (viewOffset - (viewBandwidth / 2.0)) + (wholeBandwidth / 2.0);
-                viewOffset = (viewBandwidth / 2.0) - (wholeBandwidth / 2.0);
-                if (!centerFrequencyLocked) {
-                    centerFreq += freqOffset;
-                    centerFreqMoved = true;
-                }
-            }
-
-            lowerFreq = (centerFreq + viewOffset) - (viewBandwidth / 2.0);
-            upperFreq = (centerFreq + viewOffset) + (viewBandwidth / 2.0);
-
-            if (viewBandwidth != wholeBandwidth) {
-                updateAllVFOs();
-                if (_fullUpdate) { updateWaterfallFb(); };
-            }
+            setViewOffset(viewOffset - viewDelta);
             return;
         }
 
         // If the mouse wheel is moved on the frequency scale
         if (mouseWheel != 0 && mouseInFreq) {
-            viewOffset -= (double)mouseWheel * viewBandwidth / 20.0;
-
-            if (viewOffset + (viewBandwidth / 2.0) > wholeBandwidth / 2.0) {
-                double freqOffset = (viewOffset + (viewBandwidth / 2.0)) - (wholeBandwidth / 2.0);
-                viewOffset = (wholeBandwidth / 2.0) - (viewBandwidth / 2.0);
-                centerFreq += freqOffset;
-                centerFreqMoved = true;
-            }
-            if (viewOffset - (viewBandwidth / 2.0) < -(wholeBandwidth / 2.0)) {
-                double freqOffset = (viewOffset - (viewBandwidth / 2.0)) + (wholeBandwidth / 2.0);
-                viewOffset = (viewBandwidth / 2.0) - (wholeBandwidth / 2.0);
-                centerFreq += freqOffset;
-                centerFreqMoved = true;
-            }
-
-            lowerFreq = (centerFreq + viewOffset) - (viewBandwidth / 2.0);
-            upperFreq = (centerFreq + viewOffset) + (viewBandwidth / 2.0);
-
-            if (viewBandwidth != wholeBandwidth) {
-                updateAllVFOs();
-                if (_fullUpdate) { updateWaterfallFb(); };
-            }
+            setViewOffset(viewOffset - (double)mouseWheel * viewBandwidth / 20.0);
             return;
         }
 
         // If the left and right keys are pressed while hovering the freq scale, move it too
         bool leftKeyPressed = ImGui::IsKeyPressed(ImGuiKey_LeftArrow);
         if ((leftKeyPressed || ImGui::IsKeyPressed(ImGuiKey_RightArrow)) && mouseInFreq) {
-            viewOffset += leftKeyPressed ? (viewBandwidth / 20.0) : (-viewBandwidth / 20.0);
-
-            if (viewOffset + (viewBandwidth / 2.0) > wholeBandwidth / 2.0) {
-                double freqOffset = (viewOffset + (viewBandwidth / 2.0)) - (wholeBandwidth / 2.0);
-                viewOffset = (wholeBandwidth / 2.0) - (viewBandwidth / 2.0);
-                centerFreq += freqOffset;
-                centerFreqMoved = true;
-            }
-            if (viewOffset - (viewBandwidth / 2.0) < -(wholeBandwidth / 2.0)) {
-                double freqOffset = (viewOffset - (viewBandwidth / 2.0)) + (wholeBandwidth / 2.0);
-                viewOffset = (viewBandwidth / 2.0) - (wholeBandwidth / 2.0);
-                centerFreq += freqOffset;
-                centerFreqMoved = true;
-            }
-
-            lowerFreq = (centerFreq + viewOffset) - (viewBandwidth / 2.0);
-            upperFreq = (centerFreq + viewOffset) + (viewBandwidth / 2.0);
-
-            if (viewBandwidth != wholeBandwidth) {
-                updateAllVFOs();
-                if (_fullUpdate) { updateWaterfallFb(); };
-            }
+            setViewOffset(viewOffset + (leftKeyPressed ? (viewBandwidth / 20.0) : (-viewBandwidth / 20.0)));
             return;
         }
 
@@ -525,11 +457,10 @@ namespace ImGui {
 
         // If mouse is inside waterfall, Ctrl is held and the mouse wheel is moved, zoom onto the mouse cursor
         int wheel = ImGui::GetIO().MouseWheel; // (maps to -1f/1f, depending on the direction)
-        if (wheel != 0 && ImGui::GetIO().KeyCtrl && (mouseInFFT || mouseInWaterfall)) {
-            double newZoom = std::clamp(viewZoom + ((wheel * -1.0) / 20.0), 0.0, 1.0);
+        if (wheel != 0 && (ImGui::GetIO().KeyCtrl || ImGui::IsMouseDown(ImGuiMouseButton_Right)) && (mouseInFFT || mouseInWaterfall)) {
             double fromLeft = (mousePos.x - wfMin.x) / (wfMax.x - wfMin.x);
             double targetFreq = lowerFreq + (viewBandwidth * fromLeft);
-            setZoom(newZoom);
+            setZoom(viewZoom + (wheel * -1.0) / 20.0);
             double newViewOffset = targetFreq - centerFreq + viewBandwidth * (0.5 - fromLeft);
             setViewOffset(newViewOffset);
         }
@@ -955,7 +886,11 @@ namespace ImGui {
     }
 
     void WaterFall::setCenterFrequency(double freq) {
+        if (centerFreq == freq)
+            return;
+
         centerFreq = freq;
+        centerFreqMoved = true;
         lowerFreq = (centerFreq + viewOffset) - (viewBandwidth / 2.0);
         upperFreq = (centerFreq + viewOffset) + (viewBandwidth / 2.0);
         updateAllVFOs();
@@ -999,11 +934,16 @@ namespace ImGui {
         }
         viewBandwidth = bandWidth;
         viewZoom = calculateZoomLevelFromBw(bandWidth);
+
         lowerFreq = (centerFreq + viewOffset) - (viewBandwidth / 2.0);
         upperFreq = (centerFreq + viewOffset) + (viewBandwidth / 2.0);
         range = findBestRange(bandWidth, maxHSteps);
         if (_fullUpdate) { updateWaterfallFb(); };
         updateAllVFOs();
+    }
+
+    double WaterFall::getViewBandwidth() {
+        return viewBandwidth;
     }
 
     void WaterFall::setZoom(double zoomLevel) {
@@ -1030,21 +970,28 @@ namespace ImGui {
         return zoomLevel;
     }
 
-    double WaterFall::getViewBandwidth() {
-        return viewBandwidth;
-    }
-
     void WaterFall::setViewOffset(double offset) {
         std::lock_guard<std::recursive_mutex> lck(buf_mtx);
         if (offset == viewOffset) {
             return;
         }
-        if (offset - (viewBandwidth / 2.0) < -(wholeBandwidth / 2.0)) {
-            offset = (viewBandwidth / 2.0) - (wholeBandwidth / 2.0);
+
+        if (abs(offset) + (viewBandwidth / 2.0) > wholeBandwidth / 2.0) {
+            double freqOffset;
+            if (offset > 0) {
+                freqOffset = (offset + (viewBandwidth / 2.0)) - (wholeBandwidth / 2.0);
+                offset = (wholeBandwidth / 2.0) - (viewBandwidth / 2.0);
+            }
+            else {
+                freqOffset = (offset - (viewBandwidth / 2.0)) + (wholeBandwidth / 2.0);
+                offset = (viewBandwidth / 2.0) - (wholeBandwidth / 2.0);
+            }
+            if (!centerFrequencyLocked) {
+                centerFreq += freqOffset;
+                centerFreqMoved = true;
+            }
         }
-        if (offset + (viewBandwidth / 2.0) > (wholeBandwidth / 2.0)) {
-            offset = (wholeBandwidth / 2.0) - (viewBandwidth / 2.0);
-        }
+
         viewOffset = offset;
         lowerFreq = (centerFreq + viewOffset) - (viewBandwidth / 2.0);
         upperFreq = (centerFreq + viewOffset) + (viewBandwidth / 2.0);
