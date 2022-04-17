@@ -522,6 +522,17 @@ namespace ImGui {
             selectedVFO = found ? next : highest;
             selectedVFOChanged = true;
         }
+
+        // If mouse is inside waterfall, Ctrl is held and the mouse wheel is moved, zoom onto the mouse cursor
+        int wheel = ImGui::GetIO().MouseWheel; // (maps to -1f/1f, depending on the direction)
+        if (wheel != 0 && ImGui::GetIO().KeyCtrl && (mouseInFFT || mouseInWaterfall)) {
+            double newZoom = std::clamp(viewZoom + ((wheel * -1.0) / 20.0), 0.0, 1.0);
+            double fromLeft = (mousePos.x - wfMin.x) / (wfMax.x - wfMin.x);
+            double targetFreq = lowerFreq + (viewBandwidth * fromLeft);
+            setZoom(newZoom);
+            double newViewOffset = targetFreq - centerFreq + viewBandwidth * (0.5 - fromLeft);
+            setViewOffset(newViewOffset);
+        }
     }
 
     bool WaterFall::calculateVFOSignalInfo(float* fftLine, WaterfallVFO* _vfo, float& strength, float& snr) {

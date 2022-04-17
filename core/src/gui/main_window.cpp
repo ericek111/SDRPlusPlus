@@ -593,7 +593,7 @@ void MainWindow::draw() {
 
         // Handle scrollwheel
         int wheel = ImGui::GetIO().MouseWheel;
-        if (wheel != 0 && (gui::waterfall.mouseInFFT || gui::waterfall.mouseInWaterfall)) {
+        if (wheel != 0 && (gui::waterfall.mouseInFFT || gui::waterfall.mouseInWaterfall) && !ImGui::GetIO().KeyCtrl) {
             double nfreq;
             if (vfo != NULL) {
                 nfreq = gui::waterfall.getCenterFrequency() + vfo->generalOffset + (vfo->snapInterval * wheel);
