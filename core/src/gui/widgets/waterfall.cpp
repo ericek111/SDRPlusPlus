@@ -346,20 +346,20 @@ namespace ImGui {
             double deltax = drag.x - lastDrag;
             lastDrag = drag.x;
             double viewDelta = deltax * (viewBandwidth / (double)dataWidth);
-            setViewOffset(viewOffset - viewDelta);
+            setViewOffset(viewOffset - viewDelta, true);
             return;
         }
 
         // If the mouse wheel is moved on the frequency scale
         if (mouseWheel != 0 && mouseInFreq) {
-            setViewOffset(viewOffset - (double)mouseWheel * viewBandwidth / 20.0);
+            setViewOffset(viewOffset - (double)mouseWheel * viewBandwidth / 20.0, true);
             return;
         }
 
         // If the left and right keys are pressed while hovering the freq scale, move it too
         bool leftKeyPressed = ImGui::IsKeyPressed(ImGuiKey_LeftArrow);
         if ((leftKeyPressed || ImGui::IsKeyPressed(ImGuiKey_RightArrow)) && mouseInFreq) {
-            setViewOffset(viewOffset + (leftKeyPressed ? (viewBandwidth / 20.0) : (-viewBandwidth / 20.0)));
+            setViewOffset(viewOffset + (leftKeyPressed ? (viewBandwidth / 20.0) : (-viewBandwidth / 20.0)), true);
             return;
         }
 
@@ -924,16 +924,14 @@ namespace ImGui {
         if (bandWidth == viewBandwidth) {
             return;
         }
-        if (abs(viewOffset) + (bandWidth / 2.0) > wholeBandwidth / 2.0) {
-            if (viewOffset < 0) {
-                viewOffset = (bandWidth / 2.0) - (wholeBandwidth / 2.0);
-            }
-            else {
-                viewOffset = (wholeBandwidth / 2.0) - (bandWidth / 2.0);
-            }
-        }
+
         viewBandwidth = bandWidth;
-        viewZoom = calculateZoomLevelFromBw(bandWidth);
+
+        double halfBw = (viewBandwidth / 2.0) - (wholeBandwidth / 2.0);
+        if (abs(viewOffset) + halfBw > 0) {
+            viewOffset = std::copysign(halfBw, viewOffset);
+        }
+        viewZoom = calculateZoomLevelFromBw(viewBandwidth);
 
         lowerFreq = (centerFreq + viewOffset) - (viewBandwidth / 2.0);
         upperFreq = (centerFreq + viewOffset) + (viewBandwidth / 2.0);
@@ -970,23 +968,20 @@ namespace ImGui {
         return zoomLevel;
     }
 
-    void WaterFall::setViewOffset(double offset) {
+    void WaterFall::setViewOffset(double offset, bool retune) {
         std::lock_guard<std::recursive_mutex> lck(buf_mtx);
         if (offset == viewOffset) {
             return;
         }
 
-        if (abs(offset) + (viewBandwidth / 2.0) > wholeBandwidth / 2.0) {
-            double freqOffset;
-            if (offset > 0) {
-                freqOffset = (offset + (viewBandwidth / 2.0)) - (wholeBandwidth / 2.0);
-                offset = (wholeBandwidth / 2.0) - (viewBandwidth / 2.0);
-            }
-            else {
-                freqOffset = (offset - (viewBandwidth / 2.0)) + (wholeBandwidth / 2.0);
-                offset = (viewBandwidth / 2.0) - (wholeBandwidth / 2.0);
-            }
-            if (!centerFrequencyLocked) {
+        double halfBw = (viewBandwidth / 2.0) - (wholeBandwidth / 2.0);
+        // if scrolled past the current window
+        if (abs(offset) + halfBw > 0) {
+            double oldOffset = offset;
+            offset = std::copysign(halfBw, offset);
+
+            if (retune && !centerFrequencyLocked) {
+                double freqOffset = std::copysign(std::abs(oldOffset) + halfBw, offset);
                 centerFreq += freqOffset;
                 centerFreqMoved = true;
             }

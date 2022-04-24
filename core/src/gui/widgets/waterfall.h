@@ -137,7 +137,7 @@ namespace ImGui {
         void setViewBandwidth(double bandWidth);
         double getViewBandwidth();
 
-        void setViewOffset(double offset);
+        void setViewOffset(double offset, bool retune = false);
         double getViewOffset();
 
         void setFFTMin(float min);
