@@ -262,7 +262,7 @@ namespace ImGui {
         bool calculateVFOSignalInfo(float* fftLine, WaterfallVFO* vfo, float& strength, float& snr);
         double calculateZoomLevelFromBw(double bw);
         double calculateStrongestSignal(double posRel);
-        int calculateStrongestSignalPosX(double posRel, double rangeRel);
+        size_t calculateStrongestSignalIdx(double posRel, double rangeRel);
 
         bool waterfallUpdate = false;
 
