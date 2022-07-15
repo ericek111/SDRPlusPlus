@@ -568,7 +568,7 @@ void MainWindow::draw() {
 
         // Handle scrollwheel
         int wheel = ImGui::GetIO().MouseWheel;
-        if (wheel != 0 && (gui::waterfall.mouseInFFT || gui::waterfall.mouseInWaterfall)) {
+        if (wheel != 0 && (gui::waterfall.mouseInFFT || gui::waterfall.mouseInWaterfall) && !(ImGui::GetIO().KeyCtrl || ImGui::IsMouseDown(ImGuiMouseButton_Right))) {
             double nfreq;
             if (vfo != NULL) {
                 nfreq = gui::waterfall.getCenterFrequency() + vfo->generalOffset + (vfo->snapInterval * wheel);
@@ -595,15 +595,9 @@ void MainWindow::draw() {
     ImGui::TextUnformatted("Zoom");
     ImGui::SetCursorPosX((ImGui::GetWindowSize().x / 2.0) - 10 * style::uiScale);
     ImVec2 wfSliderSize(20.0 * style::uiScale, 150.0 * style::uiScale);
+    bw = gui::waterfall.getZoom(); // check if the zoom hasn't been updated
     if (ImGui::VSliderFloat("##_7_", wfSliderSize, &bw, 1.0, 0.0, "")) {
-        double factor = (double)bw * (double)bw;
-
-        // Map 0.0 -> 1.0 to 1000.0 -> bandwidth
-        double wfBw = gui::waterfall.getBandwidth();
-        double delta = wfBw - 1000.0;
-        double finalBw = std::min<double>(1000.0 + (factor * delta), wfBw);
-
-        gui::waterfall.setViewBandwidth(finalBw);
+        gui::waterfall.setZoom(bw);
         if (vfo != NULL) {
             gui::waterfall.setViewOffset(vfo->centerOffset); // center vfo on screen
         }
