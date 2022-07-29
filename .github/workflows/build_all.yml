@@ -75,7 +75,7 @@ jobs:
               path: ${{runner.workspace}}/sdrpp_windows_x64.zip
 
     build_macos:
-        runs-on: macos-10.15
+        runs-on: macos-11
 
         steps:
         - uses: actions/checkout@v2
@@ -95,18 +95,18 @@ jobs:
         - name: Install SDRplay API
           run: wget https://www.sdrplay.com/software/SDRplay_RSP_API-MacOSX-3.07.3.pkg && sudo installer -pkg SDRplay_RSP_API-MacOSX-3.07.3.pkg -target /
 
-        # - name: Install libiio
-        #   run: git clone https://github.com/analogdevicesinc/libiio && cd libiio && mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j3 && sudo make install && cd ../../
+        - name: Install libiio
+          run: git clone https://github.com/analogdevicesinc/libiio && cd libiio && mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j3 && sudo make install && cd ../../
 
-        # - name: Install libad9361
-        #   run: git clone https://github.com/analogdevicesinc/libad9361-iio && cd libad9361-iio && mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j3 && sudo make install && cd ../../
+        - name: Install libad9361
+          run: git clone https://github.com/analogdevicesinc/libad9361-iio && cd libad9361-iio && mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j3 && sudo make install && cd ../../
 
         - name: Install LimeSuite
           run: git clone https://github.com/myriadrf/LimeSuite && cd LimeSuite && mkdir builddir && cd builddir && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j3 && sudo make install && cd ../../
 
         - name: Prepare CMake
           working-directory: ${{runner.workspace}}/build
-          run: cmake $GITHUB_WORKSPACE -DOPT_BUILD_PLUTOSDR_SOURCE=OFF -DOPT_BUILD_SOAPY_SOURCE=OFF -DOPT_BUILD_BLADERF_SOURCE=ON -DOPT_BUILD_SDRPLAY_SOURCE=ON -DOPT_BUILD_LIMESDR_SOURCE=ON -DOPT_BUILD_AUDIO_SINK=OFF -DOPT_BUILD_PORTAUDIO_SINK=ON -DOPT_BUILD_NEW_PORTAUDIO_SINK=ON -DOPT_BUILD_M17_DECODER=ON -DUSE_BUNDLE_DEFAULTS=ON -DCMAKE_BUILD_TYPE=Release
+          run: cmake $GITHUB_WORKSPACE -DOPT_BUILD_PLUTOSDR_SOURCE=ON -DOPT_BUILD_SOAPY_SOURCE=OFF -DOPT_BUILD_BLADERF_SOURCE=ON -DOPT_BUILD_SDRPLAY_SOURCE=ON -DOPT_BUILD_LIMESDR_SOURCE=ON -DOPT_BUILD_AUDIO_SINK=OFF -DOPT_BUILD_PORTAUDIO_SINK=ON -DOPT_BUILD_NEW_PORTAUDIO_SINK=ON -DOPT_BUILD_M17_DECODER=ON -DUSE_BUNDLE_DEFAULTS=ON -DCMAKE_BUILD_TYPE=Release
 
         - name: Build
           working-directory: ${{runner.workspace}}/build
@@ -232,50 +232,6 @@ jobs:
               name: sdrpp_ubuntu_focal_amd64
               path: ${{runner.workspace}}/sdrpp_debian_amd64.deb
 
-    build_ubuntu_hirsute:
-        runs-on: ubuntu-latest
-
-        steps:
-        - uses: actions/checkout@v2
-        
-        - name: Create Docker Image
-          run: cd $GITHUB_WORKSPACE/docker_builds/ubuntu_hirsute && docker build . --tag sdrpp_build
-
-        - name: Run Container
-          run: docker run --name build -v $GITHUB_WORKSPACE:/root/SDRPlusPlus --env BUILD_NO="-$GITHUB_RUN_NUMBER" sdrpp_build /root/do_build.sh
-
-        - name: Recover Deb Archive
-          working-directory: ${{runner.workspace}}
-          run: docker cp build:/root/SDRPlusPlus/sdrpp_debian_amd64.deb ./
-
-        - name: Save Deb Archive
-          uses: actions/upload-artifact@v2
-          with:
-              name: sdrpp_ubuntu_hirsute_amd64
-              path: ${{runner.workspace}}/sdrpp_debian_amd64.deb
-
-    build_ubuntu_impish:
-        runs-on: ubuntu-latest
-
-        steps:
-        - uses: actions/checkout@v2
-        
-        - name: Create Docker Image
-          run: cd $GITHUB_WORKSPACE/docker_builds/ubuntu_impish && docker build . --tag sdrpp_build
-
-        - name: Run Container
-          run: docker run --name build -v $GITHUB_WORKSPACE:/root/SDRPlusPlus --env BUILD_NO="-$GITHUB_RUN_NUMBER" sdrpp_build /root/do_build.sh
-
-        - name: Recover Deb Archive
-          working-directory: ${{runner.workspace}}
-          run: docker cp build:/root/SDRPlusPlus/sdrpp_debian_amd64.deb ./
-
-        - name: Save Deb Archive
-          uses: actions/upload-artifact@v2
-          with:
-              name: sdrpp_ubuntu_impish_amd64
-              path: ${{runner.workspace}}/sdrpp_debian_amd64.deb
-
     build_ubuntu_jammy:
         runs-on: ubuntu-latest
 
@@ -326,7 +282,7 @@ jobs:
               path: ${{runner.workspace}}/sdrpp_debian_armhf.deb
 
     create_full_archive:
-        needs: ['build_windows', 'build_macos', 'build_debian_buster', 'build_debian_bullseye', 'build_debian_sid', 'build_ubuntu_bionic', 'build_ubuntu_focal', 'build_ubuntu_hirsute', 'build_ubuntu_impish', 'build_ubuntu_jammy', 'build_raspios_bullseye_armhf']
+        needs: ['build_windows', 'build_macos', 'build_debian_buster', 'build_debian_bullseye', 'build_debian_sid', 'build_ubuntu_bionic', 'build_ubuntu_focal', 'build_ubuntu_jammy', 'build_raspios_bullseye_armhf']
         runs-on: ubuntu-latest
 
         steps:
@@ -343,8 +299,6 @@ jobs:
             mv sdrpp_debian_sid_amd64/sdrpp_debian_amd64.deb sdrpp_all/sdrpp_debian_sid_amd64.deb && 
             mv sdrpp_ubuntu_bionic_amd64/sdrpp_debian_amd64.deb sdrpp_all/sdrpp_ubuntu_bionic_amd64.deb && 
             mv sdrpp_ubuntu_focal_amd64/sdrpp_debian_amd64.deb sdrpp_all/sdrpp_ubuntu_focal_amd64.deb &&
-            mv sdrpp_ubuntu_hirsute_amd64/sdrpp_debian_amd64.deb sdrpp_all/sdrpp_ubuntu_hirsute_amd64.deb &&
-            mv sdrpp_ubuntu_impish_amd64/sdrpp_debian_amd64.deb sdrpp_all/sdrpp_ubuntu_impish_amd64.deb &&
             mv sdrpp_ubuntu_jammy_amd64/sdrpp_debian_amd64.deb sdrpp_all/sdrpp_ubuntu_jammy_amd64.deb &&
             mv sdrpp_raspios_bullseye_armhf/sdrpp_debian_armhf.deb sdrpp_all/sdrpp_raspios_bullseye_armhf.deb
 
