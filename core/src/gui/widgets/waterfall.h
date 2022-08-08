@@ -99,18 +99,24 @@ namespace ImGui {
                 width = 524288;
             }
 
-            float factor = (float)width / (float)outWidth;
-            float sFactor = ceilf(factor);
-            float uFactor;
-            float id = offset;
-            float maxVal;
-            int sId;
+            float* bufEnd = data + rawFFTSize;
+            double factor = (double)width / (double)outWidth; // The output "FFT" is `factor` times smaller than the input.
+            double id = offset;
             for (int i = 0; i < outWidth; i++) {
-                maxVal = -INFINITY;
-                sId = (int)id;
-                uFactor = (sId + sFactor > rawFFTSize) ? sFactor - ((sId + sFactor) - rawFFTSize) : sFactor;
-                for (int j = 0; j < uFactor; j++) {
-                    if (data[sId + j] > maxVal) { maxVal = data[sId + j]; }
+                // For each pixel on the output, "window" the source FFT datapoints (starting from `&data[(int) id]`
+                // and ending at `searchEnd = &data[(int) (id + factor)]`). Then find the highest peak in the range.
+                // The fractional part is discarded in the cast, so with zoomed-in view (`factor` < 1), pixels are "stretched".
+                // So with `factor` == 0.5, one pixel is `data[(int) 69]`, and the very next one is `data[(int) 69.5]`.
+                float* cursor = data + (int)id;
+                float* searchEnd = cursor + (int)factor;
+                if (searchEnd > bufEnd) { // This compiles into `cmp` and `cmovbe`, non-branching instructions.
+                    searchEnd = bufEnd;
+                }
+
+                float maxVal = *cursor;
+                while (cursor != searchEnd) {
+                    if (*cursor > maxVal) { maxVal = *cursor; }
+                    cursor++;
                 }
                 out[i] = maxVal;
                 id += factor;
@@ -312,6 +318,7 @@ namespace ImGui {
         float* rawFFTs = NULL;
         float* latestFFT;
         float* latestFFTHold;
+        float* tempZoomFFT;
         int currentFFTLine = 0;
         int fftLines = 0;
 
