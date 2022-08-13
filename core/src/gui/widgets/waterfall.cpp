@@ -1050,7 +1050,7 @@ namespace ImGui {
         viewOffset = offset;
         lowerFreq = (centerFreq + viewOffset) - (viewBandwidth / 2.0);
         upperFreq = (centerFreq + viewOffset) + (viewBandwidth / 2.0);
-        if (_fullUpdate) { updateWaterfallFb(); };
+        if (_fullUpdate && !centerFreqMoved) { updateWaterfallFb(); };
         updateAllVFOs();
     }
 
