@@ -588,11 +588,11 @@ namespace ImGui {
 
         size_t windowCenter = drawDataStart + (posRel * drawDataSize);
         size_t lowerIdx = windowCenter - rangeHalf;
-        lowerIdx = std::max(lowerIdx, drawDataStart);
-        lowerIdx = std::max((size_t) 0, lowerIdx);
+        lowerIdx = std::max<size_t>(lowerIdx, drawDataStart);
+        lowerIdx = std::max<size_t>((size_t) 0, lowerIdx);
         size_t upperIdx = windowCenter + rangeHalf;
-        upperIdx = std::min(upperIdx, drawDataStart + drawDataSize);
-        upperIdx = std::min((size_t) rawFFTSize - 1, upperIdx);
+        upperIdx = std::min<size_t>(upperIdx, drawDataStart + drawDataSize);
+        upperIdx = std::min<size_t>((size_t) rawFFTSize - 1, upperIdx);
 
         size_t maxIdx = 0;
         float maxVal = -INFINITY;
