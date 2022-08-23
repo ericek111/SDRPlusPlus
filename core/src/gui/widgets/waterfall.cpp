@@ -430,8 +430,8 @@ namespace ImGui {
             ImGui::EndTooltip();
         }
 
-        // Handle Page Up to cycle through VFOs
-        if (ImGui::IsKeyPressed(ImGuiKey_PageUp) && selVfo != NULL) {
+        // Handle Page Up or mouse4 to cycle through VFOs
+        if ((ImGui::IsKeyPressed(ImGuiKey_PageUp) || ImGui::IsMouseClicked(3)) && selVfo != NULL) {
             std::string next = (--vfos.end())->first;
             std::string lowest = "";
             double lowestOffset = INFINITY;
@@ -453,8 +453,8 @@ namespace ImGui {
             selectedVFOChanged = true;
         }
 
-        // Handle Page Down to cycle through VFOs
-        if (ImGui::IsKeyPressed(ImGuiKey_PageDown) && selVfo != NULL) {
+        // Handle Page Down or mouse5 to cycle through VFOs
+        if ((ImGui::IsKeyPressed(ImGuiKey_PageDown) || ImGui::IsMouseClicked(4)) && selVfo != NULL) {
             std::string next = (--vfos.end())->first;
             std::string highest = "";
             double highestOffset = -INFINITY;
