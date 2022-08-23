@@ -300,6 +300,7 @@ namespace ImGui {
         double range;
 
         float lastDrag;
+        float lastDragMiddle;
 
         int vfoRef = REF_CENTER;
 

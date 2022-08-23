@@ -268,6 +268,10 @@ namespace ImGui {
             lastDrag = 0;
         }
 
+        if (!ImGui::IsMouseDown(ImGuiMouseButton_Middle) || !mouseInWaterfall) {
+            lastDragMiddle = 0;
+        }
+
         bool targetFound = false;
 
         // If the mouse was clicked anywhere in the waterfall, check if the resize was clicked
@@ -354,6 +358,16 @@ namespace ImGui {
             double viewDelta = deltax * (viewBandwidth / (double)dataWidth);
             setViewOffset(viewOffset - viewDelta, true);
             return;
+        }
+
+        // Move the waterfall when holding mouse wheel
+        if (ImGui::IsMouseDown(ImGuiMouseButton_Middle) && mouseInWaterfall) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+            ImVec2 dragMiddle = ImGui::GetMouseDragDelta(ImGuiMouseButton_Middle);
+            double deltax = dragMiddle.x - lastDragMiddle;
+            lastDragMiddle = dragMiddle.x;
+            double viewDelta = deltax * (viewBandwidth / (double)dataWidth);
+            setViewOffset(viewOffset - viewDelta, true);
         }
 
         // If the mouse wheel is moved on the frequency scale
@@ -464,10 +478,11 @@ namespace ImGui {
 
         // If mouse is inside waterfall, Ctrl is held and the mouse wheel is moved, zoom onto the mouse cursor
         int wheel = ImGui::GetIO().MouseWheel; // (maps to -1f/1f, depending on the direction)
-        if (wheel != 0 && (ImGui::GetIO().KeyCtrl || ImGui::IsMouseDown(ImGuiMouseButton_Right)) && (mouseInFFT || mouseInWaterfall)) {
+        if (wheel != 0 && (ImGui::GetIO().KeyCtrl || ImGui::IsMouseDown(ImGuiMouseButton_Middle)) && (mouseInFFT || mouseInWaterfall)) {
             double fromLeft = (mousePos.x - wfMin.x) / (wfMax.x - wfMin.x);
             double targetFreq = lowerFreq + (viewBandwidth * fromLeft);
-            setZoom(viewZoom + (wheel * -1.0) / 20.0);
+            double scrollScale = ImGui::IsMouseDown(ImGuiMouseButton_Middle) ? 10.0 : 20.0; // more aggressive when holding mwheel
+            setZoom(viewZoom + (wheel * -1.0) / scrollScale);
             double newViewOffset = targetFreq - centerFreq + viewBandwidth * (0.5 - fromLeft);
             setViewOffset(newViewOffset);
         }

@@ -568,7 +568,7 @@ void MainWindow::draw() {
 
         // Handle scrollwheel
         int wheel = ImGui::GetIO().MouseWheel;
-        if (wheel != 0 && (gui::waterfall.mouseInFFT || gui::waterfall.mouseInWaterfall) && !(ImGui::GetIO().KeyCtrl || ImGui::IsMouseDown(ImGuiMouseButton_Right))) {
+        if (wheel != 0 && (gui::waterfall.mouseInFFT || gui::waterfall.mouseInWaterfall) && !(ImGui::GetIO().KeyCtrl || ImGui::IsMouseDown(ImGuiMouseButton_Right) || ImGui::IsMouseDown(ImGuiMouseButton_Middle))) {
             double nfreq;
             if (vfo != NULL) {
                 nfreq = gui::waterfall.getCenterFrequency() + vfo->generalOffset + (vfo->snapInterval * wheel);
