@@ -621,6 +621,74 @@ namespace ImGui {
         return maxIdx;
     }
 
+    double WaterFall::calculateStrongestSignal(double posRel) {
+        if (rawFFTs == NULL) {
+            return 0;
+        }
+
+        posRel = std::clamp(posRel, 0.0, 1.0);
+        float* rawFFT = &rawFFTs[currentFFTLine * rawFFTSize];
+
+        double wfAvg = 0.0;
+        double medWfAvg = 0.0;
+        for (size_t i = 0; i < rawFFTSize; i++) {
+            // iteratively calculate the mean of the FFT array
+            medWfAvg += ((double) rawFFT[i] - medWfAvg) / (i + 1);
+            wfAvg += (double) rawFFT[i];
+        }
+        wfAvg /= rawFFTSize;
+        spdlog::warn("mean: {}, avg: {}", medWfAvg, wfAvg);
+
+        // first see what's around us (10 % of bw)
+        int bigPeakIdx = calculateStrongestSignalIdx(posRel, 0.1);
+        float bigPeakSnr = rawFFT[bigPeakIdx] - wfAvg;
+
+        // then try in the immediate vicinity of the cursor
+        int smallPeakIdx = calculateStrongestSignalIdx(posRel, 0.02);
+        float smallPeakSnr = rawFFT[smallPeakIdx] - wfAvg;
+
+        // the close-by signal is reasonably strong
+        size_t foundIdx = smallPeakSnr > bigPeakSnr * 0.5 ? smallPeakIdx : bigPeakIdx;
+
+        return ((double) foundIdx / rawFFTSize);
+    }
+
+    size_t WaterFall::calculateStrongestSignalIdx(double posRel, double rangeRel) {
+        if (rawFFTs == NULL) {
+            return -1;
+        }
+
+        float* rawFFT = &rawFFTs[currentFFTLine * rawFFTSize];
+
+        // only search within the zoomed window
+        double wfRatio = (viewBandwidth / wholeBandwidth);
+        double offsetRatio = viewOffset / (wholeBandwidth / 2.0) + 1;
+        size_t drawDataSize = wfRatio * rawFFTSize;
+        size_t drawDataStart = (((double) rawFFTSize / 2.0) * offsetRatio) - (drawDataSize / 2);
+
+        // scale the search window accordingly
+        size_t rangeHalf = (rangeRel * drawDataSize) / 2.0;
+
+        size_t windowCenter = drawDataStart + (posRel * drawDataSize);
+        size_t lowerIdx = windowCenter - rangeHalf;
+        lowerIdx = std::max(lowerIdx, drawDataStart);
+        lowerIdx = std::max((size_t) 0, lowerIdx);
+        size_t upperIdx = windowCenter + rangeHalf;
+        upperIdx = std::min(upperIdx, drawDataStart + drawDataSize);
+        upperIdx = std::min((size_t) rawFFTSize - 1, upperIdx);
+
+        size_t maxIdx = 0;
+        float maxVal = -INFINITY;
+        for (size_t i = lowerIdx; i <= upperIdx; i++) {
+            if (rawFFT[i] > maxVal) {
+                maxVal = rawFFT[i];
+                maxIdx = i;
+            }
+        }
+
+        return maxIdx;
+    }
+
     void WaterFall::drawBandPlan() {
         int count = bandplan->bands.size();
         double horizScale = (double)dataWidth / viewBandwidth;
