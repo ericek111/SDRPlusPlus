@@ -568,9 +568,10 @@ private:
                 continue;
             }
 
+            /* TODO: Add check for serverMode (SmGui instead of ImGui) to prevent crashing the server.
             if (!argInfo.description.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 ImGui::SetTooltip("%s", argInfo.description.c_str());
-            }
+            } */
         }
     }
 
