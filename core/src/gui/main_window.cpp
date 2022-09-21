@@ -628,6 +628,14 @@ void MainWindow::draw() {
         core::configManager.release(true);
     }
 
+    ImGui::NewLine();
+
+    ImGui::SetCursorPosX((ImGui::GetWindowSize().x / 2.0) - 25 * style::uiScale);
+    ImVec2 autoscaleButtonSize(50.0 * style::uiScale, 50.0 * style::uiScale);
+    if (ImGui::Button("A##_sdrpp_autoscale", autoscaleButtonSize)) {
+        gui::waterfall.getAutorangeValues(fftMin, fftMax);
+    }
+
     ImGui::EndChild();
 
     gui::waterfall.setFFTMin(fftMin);

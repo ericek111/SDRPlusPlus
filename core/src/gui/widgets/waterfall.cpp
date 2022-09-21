@@ -960,6 +960,18 @@ namespace ImGui {
         fftMax = max + 5;
     }
 
+    void WaterFall::getAutorangeValues(float& targetMin, float& targetMax) {
+        std::lock_guard<std::recursive_mutex> lck(latestFFTMtx);
+        float min = INFINITY;
+        float max = -INFINITY;
+        for (int i = dataWidth * 0.2; i < dataWidth * 0.8; i++) {
+            min = std::min<float>(min, latestFFT[i]);
+            max = std::max<float>(max, latestFFT[i]);
+        }
+        targetMin = min - 10;
+        targetMax = max + 10;
+    }
+
     void WaterFall::setCenterFrequency(double freq) {
         if (centerFreq == freq)
             return;
