@@ -195,6 +195,10 @@ int sdrpp_main(int argc, char* argv[]) {
     defConfig["moduleInstances"]["Frequency Manager"] = "frequency_manager";
     defConfig["moduleInstances"]["Recorder"] = "recorder";
     defConfig["moduleInstances"]["Rigctl Server"] = "rigctl_server";
+    // defConfig["moduleInstances"]["Rigctl Client"] = "rigctl_client";
+    // TODO: Enable rigctl_client when ready
+    // defConfig["moduleInstances"]["Scanner"] = "scanner";
+    // TODO: Enable scanner when ready
 
 
     // Themes
@@ -214,6 +218,7 @@ int sdrpp_main(int argc, char* argv[]) {
     defConfig["source"] = "";
     defConfig["decimationPower"] = 0;
     defConfig["iqCorrection"] = false;
+    defConfig["invertIQ"] = false;
 
     defConfig["streams"]["Radio"]["muted"] = false;
     defConfig["streams"]["Radio"]["sink"] = "Audio";
