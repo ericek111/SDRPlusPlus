@@ -153,7 +153,15 @@ private:
             return;
         }
 
-        SoapySDR::Device* dev = SoapySDR::Device::make(devArgs);
+        SoapySDR::Device* dev = nullptr;
+
+        try {
+            dev = SoapySDR::Device::make(devArgs);
+        } catch (std::runtime_error& e) {
+            spdlog::error("Failed to select SoapySDR device: {}", e.what());
+            devId = -1;
+            return;
+        }
 
         antennaList = dev->listAntennas(SOAPY_SDR_RX, channelId);
         txtAntennaList = "";
@@ -271,6 +279,8 @@ private:
             selectSampleRate(sampleRates[0]); // Select default
         }
         config.release();
+
+        this->shouldRestart = false;
     }
 
     void saveCurrent() {
@@ -318,11 +328,22 @@ private:
         SoapyModule* _this = (SoapyModule*)ctx;
         if (_this->running) { return; }
         if (_this->devId < 0) {
-            spdlog::error("No device available");
+            _this->refresh();
+            _this->selectDevice(config.conf["device"]);
+            if (_this->devId < 0) {
+                spdlog::error("No device available");
+                return;
+            }
+        }
+
+        try {
+            _this->dev = SoapySDR::Device::make(_this->devArgs);
+        } catch (std::runtime_error& e) {
+            spdlog::error("Failed to make SoapySDR device: {}", e.what());
             return;
         }
 
-        _this->dev = SoapySDR::Device::make(_this->devArgs);
+        _this->shouldRestart = false;
 
         _this->dev->setSampleRate(SOAPY_SDR_RX, _this->channelId, _this->sampleRate);
 
@@ -395,6 +416,11 @@ private:
             return;
         }
 
+        if (_this->running && _this->shouldRestart) {
+            gui::mainWindow.setPlayState(false);
+            return;
+        }
+
         if (_this->running) { SmGui::BeginDisabled(); }
 
         SmGui::FillWidth();
@@ -411,6 +437,18 @@ private:
             if (_this->bandwidthList.size() > 2 && _this->running && _this->bandwidthList[_this->uiBandwidthId] == -1)
                 _this->dev->setBandwidth(SOAPY_SDR_RX, _this->channelId, _this->selectBwBySr(_this->sampleRates[_this->srId]));
             _this->saveCurrent();
+        }
+
+        if (_this->shouldRestart) {
+            _this->refresh();
+            if (_this->devList.size() > 0) {
+                _this->selectDevice(_this->devList[(_this->devList.size() > _this->devId ? _this->devId : 0)]["label"]);
+                if (_this->devId != -1) {
+                    gui::mainWindow.setPlayState(true);
+                    spdlog::info("SoapyModule '{0}': Playing again!", _this->name);
+                    return;
+                }
+            }
         }
 
         SmGui::SameLine();
@@ -460,6 +498,9 @@ private:
         int i = 0;
         char buf[128];
         for (auto gain : _this->gainList) {
+            if (_this->running) {
+                // _this->uiGains[i] = _this->dev->getGain(SOAPY_SDR_RX, _this->channelId, gain);
+            }
             sprintf(buf, "%s gain", gain.c_str());
             SmGui::LeftLabel(buf);
             // ImGui::SetCursorPosX(gainNameLen);
@@ -579,13 +620,21 @@ private:
         int blockSize = _this->sampleRate / 200.0f;
         int flags = 0;
         long long timeMs = 0;
+        int underflows = 0;
 
         while (_this->running) {
             int res = _this->dev->readStream(_this->devStream, (void**)&_this->stream.writeBuf, blockSize, flags, timeMs);
             if (res < 1) {
+                if (++underflows >= 3) {
+                    _this->shouldRestart = true;
+                    spdlog::error("Restarting source after {} underflows...", underflows);
+                    break;
+                }
                 continue;
             }
-            if (!_this->stream.swap(res)) { return; }
+            if (!_this->stream.swap(res)) {
+                spdlog::error("Done! {}", blockSize);
+                return; }
         }
     }
 
@@ -622,6 +671,7 @@ private:
     SoapySDR::ArgInfoList settings;
     char stringSettingVal[1024];
     std::unordered_map<std::string, std::string> configSettings;
+    std::atomic<bool> shouldRestart{false};
 
 };
 
