@@ -128,7 +128,7 @@ public:
         s2m.stop();
 
         // Stop stream
-        Pa_AbortStream(devStream);
+        Pa_StopStream(devStream);
 
         // Close the stream
         Pa_CloseStream(devStream);
@@ -141,7 +141,7 @@ public:
 
         // Select device
         ImGui::SetNextItemWidth(menuWidth);
-        if (ImGui::Combo("##audio_sink_dev_sel", &devId, deviceNamesTxt.c_str())) {
+        if (ImGui::Combo(CONCAT("##audio_sink_dev_sel_", _streamName), &devId, deviceNamesTxt.c_str())) {
             selectDevByName(deviceNames[devId]);
             stop();
             start();
@@ -154,7 +154,7 @@ public:
 
         // Select sample rate
         ImGui::SetNextItemWidth(menuWidth);
-        if (ImGui::Combo("##audio_sink_sr_sel", &srId, selectedDev.sampleRatesTxt.c_str())) {
+        if (ImGui::Combo(CONCAT("##audio_sink_sr_sel", _streamName), &srId, selectedDev.sampleRatesTxt.c_str())) {
             stop();
             start();
             if (selectedDevName != "") {
