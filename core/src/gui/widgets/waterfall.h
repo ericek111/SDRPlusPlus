@@ -1,6 +1,8 @@
 #pragma once
 #include <vector>
 #include <mutex>
+#include <atomic>
+#include <thread>
 #include <gui/widgets/bandplan.h>
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
@@ -122,6 +124,8 @@ namespace ImGui {
                 id += factor;
             }
         }
+
+        void zoomingLoop();
 
         void updatePallette(float colors[][3], int colorCount);
         void updatePalletteFromArray(float* colors, int colorCount);
@@ -321,10 +325,16 @@ namespace ImGui {
         float* latestFFT;
         float* latestFFTHold;
         float* tempZoomFFT;
+        float* workerZoomFFT;
         int currentFFTLine = 0;
         int fftLines = 0;
 
         uint32_t* waterfallFb;
+        std::thread zoomingThread;
+        std::condition_variable zoomingCond;
+        std::mutex zoomingMutex;
+        std::atomic<bool> zoomScheduled{false};
+        std::atomic<bool> zoomWorkerStop{false};
 
         bool draggingFW = false;
         int FFTAreaHeight;

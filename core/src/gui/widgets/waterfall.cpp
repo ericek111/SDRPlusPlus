@@ -86,6 +86,8 @@ namespace ImGui {
         wholeBandwidth = 1.0;
 
         updatePallette(DEFAULT_COLOR_MAP, 13);
+
+        zoomingThread = std::thread(&WaterFall::zoomingLoop, this);
     }
 
     void WaterFall::init() {
@@ -534,23 +536,58 @@ namespace ImGui {
         if (!waterfallVisible || rawFFTs == NULL) {
             return;
         }
-        double offsetRatio = viewOffset / (wholeBandwidth / 2.0);
-        int drawDataSize = (viewBandwidth / wholeBandwidth) * rawFFTSize;;
-        int drawDataStart = (((double)rawFFTSize / 2.0) * (offsetRatio + 1)) - (drawDataSize / 2);;
-        float pixel;
-        float dataRange = waterfallMax - waterfallMin;
-        int count = std::min<float>(waterfallHeight, fftLines);
-        if (rawFFTs != NULL && fftLines >= 0) {
-            for (int i = 0; i < count; i++) {
-                doZoom(drawDataStart, drawDataSize, dataWidth, &rawFFTs[((i + currentFFTLine) % waterfallHeight) * rawFFTSize], tempZoomFFT);
-                for (int j = 0; j < dataWidth; j++) {
-                    pixel = (std::clamp<float>(tempZoomFFT[j], waterfallMin, waterfallMax) - waterfallMin) / dataRange;
-                    waterfallFb[(i * dataWidth) + j] = waterfallPallet[(int)(pixel * (WATERFALL_RESOLUTION - 1))];
-                }
+        zoomScheduled = true;
+        zoomingCond.notify_all();
+    }
+
+
+    void WaterFall::zoomingLoop() {
+        zoomScheduled = false;
+        while (true) {
+            {  // zoomScheduled.wait() in C++20
+                std::unique_lock<std::mutex> lock(zoomingMutex);
+                zoomingCond.wait(lock, [&](){ return zoomScheduled || zoomWorkerStop; });
             }
-            memset(waterfallFb + (count * dataWidth), (uint32_t)255 << 24, (waterfallHeight - count) * dataWidth);
+
+            if (zoomWorkerStop) {
+                break;
+            }
+
+        zoomLoopStart:
+            zoomScheduled = false;
+            float c_waterfallMin;
+            float c_waterfallMax;
+            double offsetRatio;
+            int drawDataSize;
+
+            {
+                std::lock_guard<std::recursive_mutex> lck(buf_mtx);
+                c_waterfallMin = waterfallMin;
+                c_waterfallMax = waterfallMax;
+                offsetRatio = viewOffset / (wholeBandwidth / 2.0);
+                drawDataSize = (viewBandwidth / wholeBandwidth) * rawFFTSize;
+            }
+
+            int drawDataStart = (((double)rawFFTSize / 2.0) * (offsetRatio + 1)) - (drawDataSize / 2);;
+            float dataRange = c_waterfallMax - c_waterfallMin;
+            int count = std::min<float>(waterfallHeight, fftLines);
+            if (rawFFTs != NULL && fftLines >= 0) {
+                for (int i = 0; i < count; i++) {
+                    if (zoomScheduled) {
+                        goto zoomLoopStart; // the zoom level has already changed before we finished, go around
+                    }
+
+                    doZoom(drawDataStart, drawDataSize, dataWidth, &rawFFTs[((i + currentFFTLine) % waterfallHeight) * rawFFTSize], workerZoomFFT);
+                    for (int j = 0; j < dataWidth; j++) {
+                        float pixel = (std::clamp<float>(workerZoomFFT[j], c_waterfallMin, c_waterfallMax) - c_waterfallMin) / dataRange;
+                        waterfallFb[(i * dataWidth) + j] = waterfallPallet[(int)(pixel * (WATERFALL_RESOLUTION - 1))];
+                    }
+                }
+                // make the rest black
+                memset(waterfallFb + (count * dataWidth), (uint32_t)255 << 24, (waterfallHeight - count) * dataWidth);
+            }
+            waterfallUpdate = true;
         }
-        waterfallUpdate = true;
     }
 
     double WaterFall::calculateStrongestSignal(double posRel) {
@@ -712,6 +749,14 @@ namespace ImGui {
             return;
         }
 
+        zoomWorkerStop = true;
+        zoomingCond.notify_all();
+        if (zoomingThread.joinable()) {
+            zoomingThread.join();
+        }
+        zoomWorkerStop = false;
+        zoomingThread = std::thread(&WaterFall::zoomingLoop, this);
+
         int lastWaterfallHeight = waterfallHeight;
 
         if (waterfallVisible) {
@@ -763,6 +808,12 @@ namespace ImGui {
             delete[] tempZoomFFT;
         }
         tempZoomFFT = new float[dataWidth];
+
+        // TODO: Wait for worker to finish
+        if (workerZoomFFT != NULL) {
+            delete[] workerZoomFFT;
+        }
+        workerZoomFFT = new float[dataWidth];
 
         if (waterfallVisible) {
             delete[] waterfallFb;
