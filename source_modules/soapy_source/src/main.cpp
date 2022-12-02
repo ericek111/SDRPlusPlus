@@ -517,6 +517,11 @@ private:
             if (res) {
                 if (_this->running) {
                     _this->dev->setGain(SOAPY_SDR_RX, _this->channelId, gain, _this->uiGains[i]);
+                    int j = 0;
+                    for (auto gain2 : _this->gainList) {
+                        _this->uiGains[j] = _this->dev->getGain(SOAPY_SDR_RX, _this->channelId, gain2);
+                        j++;
+                    }
                 }
                 _this->saveCurrent();
             }
