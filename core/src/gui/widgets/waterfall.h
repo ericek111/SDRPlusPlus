@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <deque>
 #include <mutex>
 #include <atomic>
 #include <thread>
@@ -85,6 +86,7 @@ namespace ImGui {
     class WaterFall {
     public:
         WaterFall();
+        ~WaterFall();
 
         void init();
 
@@ -97,8 +99,8 @@ namespace ImGui {
             if (offset < 0) {
                 offset = 0;
             }
-            if (width > 524288) {
-                width = 524288;
+            if (width > 2097152) {
+                width = 2097152;
             }
 
             float* bufEnd = data + rawFFTSize;
@@ -124,8 +126,6 @@ namespace ImGui {
                 id += factor;
             }
         }
-
-        void zoomingLoop();
 
         void updatePallette(float colors[][3], int colorCount);
         void updatePalletteFromArray(float* colors, int colorCount);
@@ -176,6 +176,7 @@ namespace ImGui {
         void setRawFFTSize(int size);
 
         void setFullWaterfallUpdate(bool fullUpdate);
+        void setZoomWorkers(int workers);
 
         void setBandPlanPos(int pos);
 
@@ -261,6 +262,7 @@ namespace ImGui {
         void onPositionChange();
         void onResize();
         void updateWaterfallFb();
+        void zoomingLoop(int threadIdx);
         void updateWaterfallTexture();
         void updateAllVFOs(bool checkRedrawRequired = false);
         bool calculateVFOSignalInfo(float* fftLine, WaterfallVFO* vfo, float& strength, float& snr);
@@ -296,9 +298,9 @@ namespace ImGui {
         int fftHeight;           // Height of the fft graph
         int waterfallHeight = 0; // Height of the waterfall
 
-        double viewBandwidth; // actual bandwidth displayed
+        std::atomic<double> viewBandwidth; // actual bandwidth displayed
         double viewZoom;      // linearized representation of the current zoom (e. g. percentage on a slider)
-        double viewOffset;
+        std::atomic<double> viewOffset;
 
         double lowerFreq;
         double upperFreq;
@@ -316,8 +318,8 @@ namespace ImGui {
         // Ranges
         float fftMin;
         float fftMax;
-        float waterfallMin;
-        float waterfallMax;
+        std::atomic<float> waterfallMin;
+        std::atomic<float> waterfallMax;
 
         //std::vector<std::vector<float>> rawFFTs;
         int rawFFTSize;
@@ -325,16 +327,18 @@ namespace ImGui {
         float* latestFFT;
         float* latestFFTHold;
         float* tempZoomFFT;
-        float* workerZoomFFT;
-        int currentFFTLine = 0;
+        std::atomic<int> currentFFTLine = 0;
         int fftLines = 0;
 
         uint32_t* waterfallFb;
-        std::thread zoomingThread;
         std::condition_variable zoomingCond;
+        std::condition_variable zoomingResizeCond;
+        std::atomic<int> zoomWorkersLooping{0};
         std::mutex zoomingMutex;
-        std::atomic<bool> zoomScheduled{false};
-        std::atomic<bool> zoomWorkerStop{false};
+        std::vector<std::thread> zoomLoopWorkers;
+        std::deque<std::atomic<bool>> zoomChangedFlags;
+        std::atomic<bool> zoomWorkersStop{false};
+        std::atomic<bool> zoomIsResizing{false};
 
         bool draggingFW = false;
         int FFTAreaHeight;

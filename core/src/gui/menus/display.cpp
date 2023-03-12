@@ -18,6 +18,7 @@ namespace displaymenu {
     std::string colorMapAuthor = "";
     int selectedWindow = 0;
     int fftRate = 20;
+    int fftRedrawingThreads = 1;
     int uiScaleId = 0;
     bool restartRequired = false;
     bool fftHold = false;
@@ -82,6 +83,8 @@ namespace displaymenu {
 
         fullWaterfallUpdate = core::configManager.conf["fullWaterfallUpdate"];
         gui::waterfall.setFullWaterfallUpdate(fullWaterfallUpdate);
+        fftRedrawingThreads = core::configManager.conf["fftRedrawingThreads"];
+        gui::waterfall.setZoomWorkers(fftRedrawingThreads);
 
         fftSizeId = 3;
         int fftSize = core::configManager.conf["fftSize"];
@@ -129,6 +132,16 @@ namespace displaymenu {
             gui::waterfall.setFullWaterfallUpdate(fullWaterfallUpdate);
             core::configManager.acquire();
             core::configManager.conf["fullWaterfallUpdate"] = fullWaterfallUpdate;
+            core::configManager.release(true);
+        }
+
+        ImGui::LeftLabel("FFT redrawing threads");
+        ImGui::SetNextItemWidth(menuWidth - ImGui::GetCursorPosX());
+        if (ImGui::InputInt("##sdrpp_fft_workers", &fftRedrawingThreads, 1, 10)) {
+            fftRedrawingThreads = std::max<int>(1, fftRedrawingThreads);
+            gui::waterfall.setZoomWorkers(fftRedrawingThreads);
+            core::configManager.acquire();
+            core::configManager.conf["fftRedrawingThreads"] = fftRedrawingThreads;
             core::configManager.release(true);
         }
 

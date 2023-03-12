@@ -86,8 +86,20 @@ namespace ImGui {
         wholeBandwidth = 1.0;
 
         updatePallette(DEFAULT_COLOR_MAP, 13);
+        setZoomWorkers(1);
+    }
 
-        zoomingThread = std::thread(&WaterFall::zoomingLoop, this);
+    WaterFall::~WaterFall() {
+        zoomWorkersStop = true;
+        for (auto& changed : zoomChangedFlags) {
+            changed = true;
+        }
+        zoomingCond.notify_all();
+        for (auto &w : zoomLoopWorkers) {
+            if (w.joinable()) {
+                w.join();
+            }
+        }
     }
 
     void WaterFall::init() {
@@ -536,43 +548,74 @@ namespace ImGui {
         if (!waterfallVisible || rawFFTs == NULL) {
             return;
         }
-        zoomScheduled = true;
+        for (auto &w : zoomChangedFlags) {
+            w = true;
+        }
         zoomingCond.notify_all();
     }
 
-
-    void WaterFall::zoomingLoop() {
-        zoomScheduled = false;
+    void WaterFall::zoomingLoop(int threadIdx) {
+        // zoomScheduled = false;
+        spdlog::info("Starting zooming thread {}", threadIdx);
+        auto& zoomScheduled = zoomChangedFlags[threadIdx];
+        float* workerZoomFFT = new float[dataWidth];
+        auto oldDataWidth = dataWidth;
         while (true) {
             {  // zoomScheduled.wait() in C++20
                 std::unique_lock<std::mutex> lock(zoomingMutex);
-                zoomingCond.wait(lock, [&](){ return zoomScheduled || zoomWorkerStop; });
-            }
-
-            if (zoomWorkerStop) {
-                break;
+                zoomingCond.wait(lock, [&](){ return zoomScheduled.load(); });
             }
 
         zoomLoopStart:
             zoomScheduled = false;
-            float c_waterfallMin;
-            float c_waterfallMax;
-            double offsetRatio;
-            int drawDataSize;
 
-            {
-                std::lock_guard<std::recursive_mutex> lck(buf_mtx);
-                c_waterfallMin = waterfallMin;
-                c_waterfallMax = waterfallMax;
-                offsetRatio = viewOffset / (wholeBandwidth / 2.0);
-                drawDataSize = (viewBandwidth / wholeBandwidth) * rawFFTSize;
+            if (zoomWorkersStop) {
+                break;
             }
 
-            int drawDataStart = (((double)rawFFTSize / 2.0) * (offsetRatio + 1)) - (drawDataSize / 2);;
+            if (zoomIsResizing) {
+                zoomWorkersLooping--;
+                zoomingResizeCond.notify_one();
+                // wait until all variables like dataWidth are set... we will be woken up eventually.
+                {  // zoomScheduled.wait() in C++20
+                    std::unique_lock<std::mutex> lock(zoomingMutex);
+                    zoomingCond.wait(lock, [&](){ return zoomScheduled.load(); });
+                }
+                spdlog::warn("Waking up {} of {}", threadIdx, zoomLoopWorkers.size());
+                if (threadIdx >= zoomLoopWorkers.size()) {
+                    // workers have been decreased, DO NOT use the zoomScheduled flag anymore
+                    break;
+                }
+                if (dataWidth != oldDataWidth) { // we only may need to synchronize the threads.
+                    delete[] workerZoomFFT;
+                    workerZoomFFT = new float[dataWidth];
+                    oldDataWidth = dataWidth;
+                }
+                continue; // at last, loop and wait for some action
+            }
+
+            // all of the class-global variables used here should be atomic -- mutexes are slow, bleh
+            auto c_waterfallMin = waterfallMin.load();
+            auto c_waterfallMax = waterfallMax.load();
+            auto c_viewOffset = viewOffset + 0;
+            double offsetRatio = c_viewOffset / (wholeBandwidth / 2.0);
+            int drawDataSize = (viewBandwidth / wholeBandwidth) * rawFFTSize;
+
+            int drawDataStart = (((double)rawFFTSize / 2.0) * (offsetRatio + 1)) - (drawDataSize / 2);
+            // spdlog::info("Got work in {}, {}, offset: {}, size: {}", threadIdx, drawDataStart, c_viewOffset, drawDataSize);
             float dataRange = c_waterfallMax - c_waterfallMin;
             int count = std::min<float>(waterfallHeight, fftLines);
+            int workers = zoomLoopWorkers.size();
+            int step = count / workers; // divide the waterfall into blocks
+            int myMin = step * threadIdx;
+            int myMax = myMin + step;
+            if (threadIdx == (workers - 1)) { // last thread, do the rest.
+                myMax = count;
+            }
+
             if (rawFFTs != NULL && fftLines >= 0) {
-                for (int i = 0; i < count; i++) {
+                // for (int i = myMin; i < myMax; i += 1) {
+                for (int i = threadIdx; i < count; i += zoomLoopWorkers.size()) {
                     if (zoomScheduled) {
                         goto zoomLoopStart; // the zoom level has already changed before we finished, go around
                     }
@@ -588,6 +631,8 @@ namespace ImGui {
             }
             waterfallUpdate = true;
         }
+        spdlog::warn("Finishing worker {}", threadIdx);
+        delete[] workerZoomFFT;
     }
 
     double WaterFall::calculateStrongestSignal(double posRel) {
@@ -749,13 +794,20 @@ namespace ImGui {
             return;
         }
 
-        zoomWorkerStop = true;
-        zoomingCond.notify_all();
-        if (zoomingThread.joinable()) {
-            zoomingThread.join();
+
+
+        // spdlog::warn("Changing zoom workers from {} to {}", zoomLoopWorkers.size(), workers);
+
+        zoomIsResizing = true;
+        zoomWorkersLooping = zoomLoopWorkers.size();
+        for (std::size_t i = 0; i != zoomChangedFlags.size(); ++i) {
+            zoomChangedFlags[i] = true;
         }
-        zoomWorkerStop = false;
-        zoomingThread = std::thread(&WaterFall::zoomingLoop, this);
+        zoomingCond.notify_all();
+        {  // synchronize this thread with the workers -- wait until they're done
+            std::unique_lock<std::mutex> lock(zoomingMutex);
+            zoomingResizeCond.wait(lock, [&](){ return zoomWorkersLooping == 0; });
+        }
 
         int lastWaterfallHeight = waterfallHeight;
 
@@ -809,12 +861,6 @@ namespace ImGui {
         }
         tempZoomFFT = new float[dataWidth];
 
-        // TODO: Wait for worker to finish
-        if (workerZoomFFT != NULL) {
-            delete[] workerZoomFFT;
-        }
-        workerZoomFFT = new float[dataWidth];
-
         if (waterfallVisible) {
             delete[] waterfallFb;
             waterfallFb = new uint32_t[dataWidth * waterfallHeight];
@@ -842,6 +888,12 @@ namespace ImGui {
 
         updateWaterfallFb();
         updateAllVFOs();
+
+        zoomIsResizing = false; // we're done, wake up the workers to let them reallocate their buffers
+        for (auto& changed : zoomChangedFlags) {
+            changed = true;
+        }
+        zoomingCond.notify_all();
     }
 
     void WaterFall::draw() {
@@ -1157,6 +1209,54 @@ namespace ImGui {
     void WaterFall::setFullWaterfallUpdate(bool fullUpdate) {
         std::lock_guard<std::recursive_mutex> lck(buf_mtx);
         _fullUpdate = fullUpdate;
+    }
+
+    void WaterFall::setZoomWorkers(int workers) {
+        // zoomIsResizing
+        if (workers == zoomLoopWorkers.size()) {
+            return;
+        }
+
+        spdlog::warn("Changing zoom workers from {} to {}", zoomLoopWorkers.size(), workers);
+
+        zoomIsResizing = true;
+        zoomWorkersLooping = zoomLoopWorkers.size();
+        for (auto& changed : zoomChangedFlags) {
+            changed = true;
+        }
+        zoomingCond.notify_all();
+        {  // synchronize this thread with the workers -- wait until they're done
+            std::unique_lock<std::mutex> lock(zoomingMutex);
+            zoomingResizeCond.wait(lock, [&](){ return zoomWorkersLooping == 0; });
+        }
+
+        if (workers < zoomLoopWorkers.size()) {
+            // first remove the threads
+            for (int i = zoomLoopWorkers.size(); i > workers; i--) {
+                zoomLoopWorkers.back().detach(); // the thread will end when we wake up the workers
+                zoomLoopWorkers.pop_back();
+            }
+
+            for (auto& changed : zoomChangedFlags) {
+                changed = true;
+            }
+            zoomingCond.notify_all(); // wake up the workers
+            // they won't be using their zoomScheduled flag anymore, no need for another sync
+            for (int i = zoomChangedFlags.size() - 1; i > workers; i--) {
+                zoomChangedFlags.pop_back();
+            }
+        } else {
+            for (int i = zoomLoopWorkers.size(); i < workers; i++) {
+                zoomChangedFlags.emplace_back(false);
+                zoomLoopWorkers.push_back(std::move(std::thread(&WaterFall::zoomingLoop, this, i)));
+            }
+        }
+
+        zoomIsResizing = false;
+        for (auto& changed : zoomChangedFlags) {
+            changed = true;
+        }
+        zoomingCond.notify_all();
     }
 
     void WaterFall::setWaterfallMin(float min) {
