@@ -31,14 +31,15 @@ namespace sdrpp_credits {
         "fftw3 (fftw.org)",
         "glfw (Camilla Löwy)",
         "json (nlohmann)",
-        "spdlog (gabime)",
         "Portable File Dialogs"
     };
 
     const char* hardwareDonators[] = {
+        "Aaronia AG",
         "Airspy",
         "Analog Devices",
         "CaribouLabs",
+        "Ettus Research",
         "Howard Su",
         "MyriadRF",
         "Nuand",

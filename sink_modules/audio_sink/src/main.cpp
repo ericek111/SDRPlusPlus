@@ -5,7 +5,7 @@
 #include <signal_path/sink.h>
 #include <dsp/buffer/packer.h>
 #include <dsp/convert/stereo_to_mono.h>
-#include <spdlog/spdlog.h>
+#include <utils/flog.h>
 #include <RtAudio.h>
 #include <config.h>
 #include <core.h>
@@ -59,20 +59,16 @@ public:
     }
 
     ~AudioSink() {
+        stop();
     }
 
     void start() {
-        if (running) {
-            return;
-        }
-        doStart();
-        running = true;
+        if (running) { return; }
+        running = doStart();
     }
 
     void stop() {
-        if (!running) {
-            return;
-        }
+        if (!running) { return; }
         doStop();
         running = false;
     }
@@ -157,7 +153,7 @@ public:
     }
 
 private:
-    void doStart() {
+    bool doStart() {
         RtAudio::StreamParameters parameters;
         parameters.deviceId = deviceIds[devId];
         parameters.nChannels = 2;
@@ -173,11 +169,12 @@ private:
             stereoPacker.start();
         }
         catch (RtAudioError& e) {
-            spdlog::error("Could not open audio device");
-            return;
+            flog::error("Could not open audio device");
+            return false;
         }
 
-        spdlog::info("RtAudio stream open");
+        flog::info("RtAudio stream open");
+        return true;
     }
 
     void doStop() {
@@ -198,11 +195,11 @@ private:
         if (count < 0) { return 0; }
 
         // For debug purposes only...
-        // if (nBufferFrames != count) { spdlog::warn("Buffer size mismatch, wanted {0}, was asked for {1}", count, nBufferFrames); }
+        // if (nBufferFrames != count) { flog::warn("Buffer size mismatch, wanted {0}, was asked for {1}", count, nBufferFrames); }
         // for (int i = 0; i < count; i++) {
-        //     if (_this->stereoPacker.out.readBuf[i].l == NAN || _this->stereoPacker.out.readBuf[i].r == NAN) { spdlog::error("NAN in audio data"); }
-        //     if (_this->stereoPacker.out.readBuf[i].l == INFINITY || _this->stereoPacker.out.readBuf[i].r == INFINITY) { spdlog::error("INFINITY in audio data"); }
-        //     if (_this->stereoPacker.out.readBuf[i].l == -INFINITY || _this->stereoPacker.out.readBuf[i].r == -INFINITY) { spdlog::error("-INFINITY in audio data"); }
+        //     if (_this->stereoPacker.out.readBuf[i].l == NAN || _this->stereoPacker.out.readBuf[i].r == NAN) { flog::error("NAN in audio data"); }
+        //     if (_this->stereoPacker.out.readBuf[i].l == INFINITY || _this->stereoPacker.out.readBuf[i].r == INFINITY) { flog::error("INFINITY in audio data"); }
+        //     if (_this->stereoPacker.out.readBuf[i].l == -INFINITY || _this->stereoPacker.out.readBuf[i].r == -INFINITY) { flog::error("-INFINITY in audio data"); }
         // }
 
         memcpy(outputBuffer, _this->stereoPacker.out.readBuf, nBufferFrames * sizeof(dsp::stereo_t));

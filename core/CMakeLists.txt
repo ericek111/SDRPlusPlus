@@ -13,6 +13,7 @@ endif (USE_BUNDLE_DEFAULTS)
 file(GLOB_RECURSE SRC "src/*.cpp" "src/*.c")
 
 add_definitions(-DSDRPP_IS_CORE)
+add_definitions(-DFLOG_ANDROID_TAG="SDR++")
 if (MSVC)
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif ()
@@ -30,13 +31,7 @@ endif (OPT_BACKEND_ANDROID)
 add_library(sdrpp_core SHARED ${SRC} ${BACKEND_SRC})
 
 # Set compiler options
-if (MSVC)
-    target_compile_options(sdrpp_core PRIVATE /O2 /Ob2 /std:c++17 /EHsc)
-elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options(sdrpp_core PRIVATE -O3 -std=c++17)
-else ()
-    target_compile_options(sdrpp_core PRIVATE -O3 -std=c++17)
-endif ()
+target_compile_options(sdrpp_core PRIVATE ${SDRPP_COMPILER_FLAGS})
 
 # Set the install prefix
 target_compile_definitions(sdrpp_core PUBLIC INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX}")
@@ -101,7 +96,7 @@ if (MSVC)
     target_link_libraries(sdrpp_core PUBLIC FFTW3::fftw3f)
 
     # WinSock2
-    target_link_libraries(sdrpp_core PUBLIC wsock32 ws2_32)
+    target_link_libraries(sdrpp_core PUBLIC wsock32 ws2_32 iphlpapi)
 
     # ZSTD
     find_package(zstd CONFIG REQUIRED)

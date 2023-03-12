@@ -1,6 +1,6 @@
 #include <SoapySDR/Constants.h>
 #include <imgui.h>
-#include <spdlog/spdlog.h>
+#include <utils/flog.h>
 #include <module.h>
 #include <gui/gui.h>
 #include <gui/widgets/stepped_slider.h>
@@ -103,12 +103,12 @@ private:
                 break;
             }
         }
-        spdlog::info("Bandwidth for samplerate {0} is {1}", samplerate, cur);
+        flog::info("Bandwidth for samplerate {0} is {1}", samplerate, cur);
         return cur;
     }
 
     void selectSampleRate(double samplerate) {
-        spdlog::info("Setting sample rate to {0}", samplerate);
+        flog::info("Setting sample rate to {0}", samplerate);
         if (sampleRates.size() == 0) {
             devId = -1;
             return;
@@ -312,7 +312,7 @@ private:
 
     static void menuSelected(void* ctx) {
         SoapyModule* _this = (SoapyModule*)ctx;
-        spdlog::info("SoapyModule '{0}': Menu Select!", _this->name);
+        flog::info("SoapyModule '{0}': Menu Select!", _this->name);
         if (_this->devList.size() == 0) {
             return;
         }
@@ -321,7 +321,7 @@ private:
 
     static void menuDeselected(void* ctx) {
         SoapyModule* _this = (SoapyModule*)ctx;
-        spdlog::info("SoapyModule '{0}': Menu Deselect!", _this->name);
+        flog::info("SoapyModule '{0}': Menu Deselect!", _this->name);
     }
 
     static void start(void* ctx) {
@@ -376,7 +376,7 @@ private:
         _this->dev->activateStream(_this->devStream);
         _this->running = true;
         _this->workerThread = std::thread(_worker, _this);
-        spdlog::info("SoapyModule '{0}': Start!", _this->name);
+        flog::info("SoapyModule '{0}': Start!", _this->name);
     }
 
     static void stop(void* ctx) {
@@ -390,7 +390,7 @@ private:
         _this->stream.clearWriteStop();
         SoapySDR::Device::unmake(_this->dev);
 
-        spdlog::info("SoapyModule '{0}': Stop!", _this->name);
+        flog::info("SoapyModule '{0}': Stop!", _this->name);
     }
 
     static void tune(double freq, void* ctx) {
@@ -399,7 +399,7 @@ private:
         if (_this->running) {
             _this->dev->setFrequency(SOAPY_SDR_RX, _this->channelId, freq);
         }
-        spdlog::info("SoapyModule '{0}': Tune: {1}!", _this->name, freq);
+        flog::info("SoapyModule '{0}': Tune: {1}!", _this->name, freq);
     }
 
     static void menuHandler(void* ctx) {

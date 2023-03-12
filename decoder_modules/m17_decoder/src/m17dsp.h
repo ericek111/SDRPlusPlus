@@ -16,7 +16,7 @@ extern "C" {
 #define M17_DEVIATION     2400.0f
 #define M17_BAUDRATE      4800.0f
 #define M17_RRC_ALPHA     0.5f
-#define M17_4FSK_HIGH_CUT 0.5f
+#define M17_4FSK_HIGH_CUT ((1.0f + (1.0f/3.0f)) / 2.0f)
 
 #define M17_SYNC_SIZE            16
 #define M17_LICH_SIZE            96
@@ -26,6 +26,10 @@ extern "C" {
 #define M17_ENCODED_LSF_SIZE     488
 #define M17_RAW_FRAME_SIZE       384
 #define M17_CUT_FRAME_SIZE       368
+
+#define M17_MAX_FN          0x7FFF
+#define M17_END_FN          0x8000
+#define M17_STREAM_TIMEOUT  500
 
 const uint8_t M17_LSF_SYNC[16] = { 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1 };
 const uint8_t M17_STF_SYNC[16] = { 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1 };
@@ -223,7 +227,7 @@ namespace dsp {
                     detect = true;
                     outCount = 0;
                     type = 0;
-                    //spdlog::warn("Found sync frame");
+                    //flog::warn("Found sync frame");
                     continue;
                 }
 
@@ -232,7 +236,7 @@ namespace dsp {
                     detect = true;
                     outCount = 0;
                     type = 1;
-                    //spdlog::warn("Found stream frame");
+                    //flog::warn("Found stream frame");
                     continue;
                 }
 
@@ -241,7 +245,7 @@ namespace dsp {
                     detect = true;
                     outCount = 0;
                     type = 2;
-                    //spdlog::warn("Found packet frame");
+                    //flog::warn("Found packet frame");
                     continue;
                 }
 
@@ -438,6 +442,7 @@ namespace dsp {
 
         void init(stream<uint8_t>* in) {
             _in = in;
+            lastConseqTime = std::chrono::high_resolution_clock::now();
 
             codec = codec2_create(CODEC2_MODE_3200);
             sampsPerC2Frame = codec2_samples_per_frame(codec);
@@ -460,9 +465,45 @@ namespace dsp {
             block::tempStart();
         }
 
+        bool isReceiving() {
+            std::lock_guard<std::recursive_mutex> lck(recvMtx);
+            return receiving && !timedOut();
+        }
+
+        bool timedOut() {
+            std::lock_guard<std::recursive_mutex> lck(recvMtx);
+            auto now = std::chrono::high_resolution_clock::now();
+            return std::chrono::duration_cast<std::chrono::milliseconds>(now - lastConseqTime).count() > M17_STREAM_TIMEOUT;
+        }
+
         int run() {
             int count = _in->read();
             if (count < 0) { return -1; }
+
+            // Decode frame number
+            uint16_t fn = ((uint16_t)_in->readBuf[0] << 8) | _in->readBuf[1];
+
+            // Check if we need to start or stop receiving
+            bool consecutive = ((((int)fn - (int)lastFn + M17_END_FN) % M17_END_FN) == 1);
+            if (!receiving && consecutive) {
+                std::lock_guard<std::recursive_mutex> lck(recvMtx);
+                receiving = true;
+            }
+            else if (receiving && consecutive) {
+                std::lock_guard<std::recursive_mutex> lck(recvMtx);
+                lastConseqTime = std::chrono::high_resolution_clock::now();;
+            }
+            else if (receiving && !consecutive && timedOut()) {
+                std::lock_guard<std::recursive_mutex> lck(recvMtx);
+                receiving = false;
+            }
+
+            // Save FN and if we have to stop receiving and it's not the last frame, stop
+            lastFn = fn;
+            if (!receiving) {
+                _in->flush();
+                return count;
+            }
 
             // Decode both parts using codec
             codec2_decode(codec, int16Audio, &_in->readBuf[2]);
@@ -484,6 +525,11 @@ namespace dsp {
 
     private:
         stream<uint8_t>* _in;
+
+        std::recursive_mutex recvMtx;
+        bool receiving = false;
+        uint16_t lastFn = 0;
+        std::chrono::high_resolution_clock::time_point lastConseqTime;
 
         int16_t* int16Audio;
         float* floatAudio;
@@ -635,6 +681,10 @@ namespace dsp {
         void setInput(stream<complex_t>* input) {
             assert(hier_block::_block_init);
             demod.setInput(input);
+        }
+
+        bool isReceiving() {
+            return decodeAudio.isReceiving();
         }
 
         stream<float>* diagOut = NULL;

@@ -12,6 +12,7 @@
 #include <dsp/multirate/rational_resampler.h>
 #include <dsp/filter/deephasis.h>
 #include <core.h>
+#include <stdint.h>
 #include <utils/optionlist.h>
 #include "radio_interface.h"
 #include "demod.h"
@@ -321,7 +322,7 @@ private:
         auto startTime = std::chrono::high_resolution_clock::now();
         demod::Demodulator* demod = instantiateDemod(id);
         if (!demod) {
-            spdlog::error("Demodulator {0} not implemented", id);
+            flog::error("Demodulator {0} not implemented", (int)id);
             return;
         }
         selectedDemodID = id;
@@ -332,7 +333,7 @@ private:
         config.conf[name]["selectedDemodId"] = id;
         config.release(true);
         auto endTime = std::chrono::high_resolution_clock::now();
-        spdlog::warn("Demod switch took {0} us", (std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime)).count());
+        flog::warn("Demod switch took {0} us", (int64_t)((std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime)).count()));
     }
 
     void selectDemod(demod::Demodulator* demod) {
@@ -426,7 +427,7 @@ private:
         // Configure noise blanker
         nb.setRate(500.0 / ifSamplerate);
         setNBLevel(nbLevel);
-        setNBEnabled(nbAllowed&& nbEnabled);
+        setNBEnabled(nbAllowed && nbEnabled);
 
         // Configure FM IF Noise Reduction
         setIFNRPreset((selectedDemodID == RADIO_DEMOD_NFM) ? ifnrPresets[fmIFPresetId] : IFNR_PRESET_BROADCAST);
