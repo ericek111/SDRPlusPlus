@@ -4,6 +4,7 @@
 #include <mutex>
 #include <atomic>
 #include <thread>
+#include <condition_variable>
 #include <gui/widgets/bandplan.h>
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
@@ -99,8 +100,8 @@ namespace ImGui {
             if (offset < 0) {
                 offset = 0;
             }
-            if (width > 2097152) {
-                width = 2097152;
+            if (width > 524288) {
+                width = 524288;
             }
 
             float* bufEnd = data + rawFFTSize;

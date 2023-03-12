@@ -556,7 +556,7 @@ namespace ImGui {
 
     void WaterFall::zoomingLoop(int threadIdx) {
         // zoomScheduled = false;
-        spdlog::info("Starting zooming thread {}", threadIdx);
+        flog::info("Starting zooming thread {}", threadIdx);
         auto& zoomScheduled = zoomChangedFlags[threadIdx];
         float* workerZoomFFT = new float[dataWidth];
         auto oldDataWidth = dataWidth;
@@ -581,7 +581,7 @@ namespace ImGui {
                     std::unique_lock<std::mutex> lock(zoomingMutex);
                     zoomingCond.wait(lock, [&](){ return zoomScheduled.load(); });
                 }
-                spdlog::warn("Waking up {} of {}", threadIdx, zoomLoopWorkers.size());
+                flog::warn("Waking up {} of {}", threadIdx, zoomLoopWorkers.size());
                 if (threadIdx >= zoomLoopWorkers.size()) {
                     // workers have been decreased, DO NOT use the zoomScheduled flag anymore
                     break;
@@ -602,7 +602,7 @@ namespace ImGui {
             int drawDataSize = (viewBandwidth / wholeBandwidth) * rawFFTSize;
 
             int drawDataStart = (((double)rawFFTSize / 2.0) * (offsetRatio + 1)) - (drawDataSize / 2);
-            // spdlog::info("Got work in {}, {}, offset: {}, size: {}", threadIdx, drawDataStart, c_viewOffset, drawDataSize);
+            // flog::info("Got work in {}, {}, offset: {}, size: {}", threadIdx, drawDataStart, c_viewOffset, drawDataSize);
             float dataRange = c_waterfallMax - c_waterfallMin;
             int count = std::min<float>(waterfallHeight, fftLines);
             int workers = zoomLoopWorkers.size();
@@ -631,7 +631,7 @@ namespace ImGui {
             }
             waterfallUpdate = true;
         }
-        spdlog::warn("Finishing worker {}", threadIdx);
+        flog::warn("Finishing worker {}", threadIdx);
         delete[] workerZoomFFT;
     }
 
@@ -651,7 +651,7 @@ namespace ImGui {
             wfAvg += (double) rawFFT[i];
         }
         wfAvg /= rawFFTSize;
-        spdlog::warn("mean: {}, avg: {}", medWfAvg, wfAvg);
+        flog::warn("mean: {}, avg: {}", medWfAvg, wfAvg);
 
         // first see what's around us (10 % of bw)
         int bigPeakIdx = calculateStrongestSignalIdx(posRel, 0.1);
@@ -796,7 +796,7 @@ namespace ImGui {
 
 
 
-        // spdlog::warn("Changing zoom workers from {} to {}", zoomLoopWorkers.size(), workers);
+        // flog::warn("Changing zoom workers from {} to {}", zoomLoopWorkers.size(), workers);
 
         zoomIsResizing = true;
         zoomWorkersLooping = zoomLoopWorkers.size();
@@ -1217,7 +1217,7 @@ namespace ImGui {
             return;
         }
 
-        spdlog::warn("Changing zoom workers from {} to {}", zoomLoopWorkers.size(), workers);
+        flog::warn("Changing zoom workers from {} to {}", zoomLoopWorkers.size(), workers);
 
         zoomIsResizing = true;
         zoomWorkersLooping = zoomLoopWorkers.size();

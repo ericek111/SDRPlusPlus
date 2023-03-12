@@ -69,7 +69,7 @@ public:
         }
         vfo = sigpath::vfoManager.createVFO(name, ImGui::WaterfallVFO::REF_CENTER, 0, 2400000, 2400000 /*sample rate*/, 0, 0, false);
 //        vfoSink.init(vfo->output, _vfoSinkHandler, this);
-        spdlog::info("data: {} {}", sizeof(writeBuffer), sizeof(writeBuffer[0]));
+        flog::info("data: {} {}", sizeof(writeBuffer), sizeof(writeBuffer[0]));
         packer.init(vfo->output, writeBufSize / 2 / sizeof(writeBuffer[0]));
         hnd.init(&packer.out, _vfoSinkHandler, this);
         // vfoSink.start();
@@ -134,7 +134,7 @@ private:
             return true;
         }
         catch (std::exception e) {
-            spdlog::error("Could not start RTL-TCP server: {0}", e.what());
+            flog::error("Could not start RTL-TCP server: {0}", e.what());
         }
 
         return false;
@@ -147,7 +147,7 @@ private:
 
     static void clientHandler(net::Conn _client, void* ctx) {
         RTLTCPServerModule* _this = (RTLTCPServerModule*)ctx;
-        spdlog::info("New client!");
+        flog::info("New client!");
 
         _this->client = std::move(_client);
         uint8_t dongleInfo[12] = {'R', 'T', 'L', '0', 0}; // to not confuse some clients
@@ -156,7 +156,7 @@ private:
         _this->client->waitForEnd();
         _this->client->close();
 
-        spdlog::info("Client disconnected!");
+        flog::info("Client disconnected!");
 
         _this->listener->acceptAsync(clientHandler, _this);
     }
@@ -172,7 +172,7 @@ private:
     }
 
     void commandHandler(uint8_t cmd, uint32_t arg) {
-        spdlog::info("Command: {}   {}", cmd, arg);
+        flog::info("Command: {}   {}", cmd, arg);
         std::lock_guard lck(vfoMtx);
         if (cmd == 1) {
             tuner::tune(tuner::TUNER_MODE_NORMAL, name, arg);
@@ -184,7 +184,7 @@ private:
     }
 
     static void _vfoSinkHandler(dsp::complex_t* data, int count, void* ctx) {
-        // spdlog::info("count: {}", count);
+        // flog::info("count: {}", count);
         RTLTCPServerModule* _this = (RTLTCPServerModule*)ctx;
         if (!_this->client || !_this->client->isOpen()) {
             return;

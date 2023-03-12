@@ -158,7 +158,7 @@ private:
         try {
             dev = SoapySDR::Device::make(devArgs);
         } catch (std::runtime_error& e) {
-            spdlog::error("Failed to select SoapySDR device: {}", e.what());
+            flog::error("Failed to select SoapySDR device: {}", e.what());
             devId = -1;
             return;
         }
@@ -331,7 +331,7 @@ private:
             _this->refresh();
             _this->selectDevice(config.conf["device"]);
             if (_this->devId < 0) {
-                spdlog::error("No device available");
+                flog::error("No device available");
                 return;
             }
         }
@@ -339,7 +339,7 @@ private:
         try {
             _this->dev = SoapySDR::Device::make(_this->devArgs);
         } catch (std::runtime_error& e) {
-            spdlog::error("Failed to make SoapySDR device: {}", e.what());
+            flog::error("Failed to make SoapySDR device: {}", e.what());
             return;
         }
 
@@ -445,7 +445,7 @@ private:
                 _this->selectDevice(_this->devList[(_this->devList.size() > _this->devId ? _this->devId : 0)]["label"]);
                 if (_this->devId != -1) {
                     gui::mainWindow.setPlayState(true);
-                    spdlog::info("SoapyModule '{0}': Playing again!", _this->name);
+                    flog::info("SoapyModule '{0}': Playing again!", _this->name);
                     return;
                 }
             }
@@ -610,7 +610,7 @@ private:
                     _this->saveCurrent();
                 }
             } else {
-                spdlog::warn("Unknown Soapy argument type: {} for {} ({})", argInfo.type, argInfo.key, argInfo.name);
+                flog::warn("Unknown Soapy argument type: {} for {} ({})", (int) argInfo.type, argInfo.key, argInfo.name);
                 continue;
             }
 
@@ -632,13 +632,13 @@ private:
             if (res < 1) {
                 if (++underflows >= 3) {
                     _this->shouldRestart = true;
-                    spdlog::error("Restarting source after {} underflows...", underflows);
+                    flog::error("Restarting source after {} underflows...", underflows);
                     break;
                 }
                 continue;
             }
             if (!_this->stream.swap(res)) {
-                spdlog::error("Done! {}", blockSize);
+                flog::error("Done! {}", blockSize);
                 return; }
         }
     }
