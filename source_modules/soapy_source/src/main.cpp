@@ -541,6 +541,8 @@ private:
             }
         }
 
+#ifdef SOAPY_SDR_TRUE
+        // The templated read/writeSetting functions have been introduced in SoapySDR 0.8. This is a lazy fix for old versions.
         for (SoapySDR::ArgInfo argInfo : _this->settings) {
             if (!_this->running)
                 break;
@@ -619,6 +621,7 @@ private:
                 ImGui::SetTooltip("%s", argInfo.description.c_str());
             } */
         }
+#endif
     }
 
     static void _worker(SoapyModule* _this) {
