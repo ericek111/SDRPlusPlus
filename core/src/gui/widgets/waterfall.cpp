@@ -556,7 +556,6 @@ namespace ImGui {
 
     void WaterFall::zoomingLoop(int threadIdx) {
         // zoomScheduled = false;
-        flog::info("Starting zooming thread {}", threadIdx);
         auto& zoomScheduled = zoomChangedFlags[threadIdx];
         float* workerZoomFFT = new float[dataWidth];
         auto oldDataWidth = dataWidth;
@@ -581,7 +580,7 @@ namespace ImGui {
                     std::unique_lock<std::mutex> lock(zoomingMutex);
                     zoomingCond.wait(lock, [&](){ return zoomScheduled.load(); });
                 }
-                flog::warn("Waking up {} of {}", threadIdx, zoomLoopWorkers.size());
+                // flog::warn("Waking up {} of {}", threadIdx, zoomLoopWorkers.size());
                 if (threadIdx >= zoomLoopWorkers.size()) {
                     // workers have been decreased, DO NOT use the zoomScheduled flag anymore
                     break;
@@ -631,7 +630,6 @@ namespace ImGui {
             }
             waterfallUpdate = true;
         }
-        flog::warn("Finishing worker {}", threadIdx);
         delete[] workerZoomFFT;
     }
 
@@ -651,7 +649,6 @@ namespace ImGui {
             wfAvg += (double) rawFFT[i];
         }
         wfAvg /= rawFFTSize;
-        flog::warn("mean: {}, avg: {}", medWfAvg, wfAvg);
 
         // first see what's around us (10 % of bw)
         int bigPeakIdx = calculateStrongestSignalIdx(posRel, 0.1);
@@ -793,10 +790,6 @@ namespace ImGui {
         if (widgetSize.x < 100 || widgetSize.y < 100) {
             return;
         }
-
-
-
-        // flog::warn("Changing zoom workers from {} to {}", zoomLoopWorkers.size(), workers);
 
         zoomIsResizing = true;
         zoomWorkersLooping = zoomLoopWorkers.size();
@@ -1216,8 +1209,6 @@ namespace ImGui {
         if (workers == zoomLoopWorkers.size()) {
             return;
         }
-
-        flog::warn("Changing zoom workers from {} to {}", zoomLoopWorkers.size(), workers);
 
         zoomIsResizing = true;
         zoomWorkersLooping = zoomLoopWorkers.size();
