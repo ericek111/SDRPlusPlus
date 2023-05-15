@@ -178,6 +178,8 @@ int sdrpp_main(int argc, char* argv[]) {
     defConfig["moduleInstances"]["Hermes Source"]["enabled"] = true;
     defConfig["moduleInstances"]["LimeSDR Source"]["module"] = "limesdr_source";
     defConfig["moduleInstances"]["LimeSDR Source"]["enabled"] = true;
+    defConfig["moduleInstances"]["MiriSDR Source"]["module"] = "mirisdr_source";
+    defConfig["moduleInstances"]["MiriSDR Source"]["enabled"] = true;
     defConfig["moduleInstances"]["PlutoSDR Source"]["module"] = "plutosdr_source";
     defConfig["moduleInstances"]["PlutoSDR Source"]["enabled"] = true;
     defConfig["moduleInstances"]["RFspace Source"]["module"] = "rfspace_source";
@@ -275,6 +277,7 @@ int sdrpp_main(int argc, char* argv[]) {
     core::configManager.conf["modules"][modCount++] = "airspyhf_source.so";
     core::configManager.conf["modules"][modCount++] = "hackrf_source.so";
     core::configManager.conf["modules"][modCount++] = "hermes_source.so";
+    core::configManager.conf["modules"][modCount++] = "mirisdr_source.so";
     core::configManager.conf["modules"][modCount++] = "plutosdr_source.so";
     core::configManager.conf["modules"][modCount++] = "rfspace_source.so";
     core::configManager.conf["modules"][modCount++] = "rtl_sdr_source.so";
@@ -292,6 +295,7 @@ int sdrpp_main(int argc, char* argv[]) {
     core::configManager.conf["modules"][modCount++] = "frequency_manager.so";
     core::configManager.conf["modules"][modCount++] = "recorder.so";
     core::configManager.conf["modules"][modCount++] = "rigctl_server.so";
+    core::configManager.conf["modules"][modCount++] = "rtltcp_server.so";
     core::configManager.conf["modules"][modCount++] = "scanner.so";
 #endif
 

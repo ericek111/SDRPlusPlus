@@ -452,6 +452,11 @@ namespace backend {
         { 0x1f4d, 0xd286 },
         { 0x1f4d, 0xd803 }
     };
+
+    const std::vector<DevVIDPID> MIRISDR_VIDPIDS = {
+        { 0x1df7, 0x2500 }, // Mirics MSi2500 default (e.g. VTX3D card)
+        { 0x1df7, 0x3000 }, // SDRplay RSP1A
+    };
 }
 
 extern "C" {

@@ -12,6 +12,7 @@ namespace backend {
     extern const std::vector<DevVIDPID> AIRSPYHF_VIDPIDS;
     extern const std::vector<DevVIDPID> HACKRF_VIDPIDS;
     extern const std::vector<DevVIDPID> RTL_SDR_VIDPIDS;
+    extern const std::vector<DevVIDPID> MIRISDR_VIDPIDS;
 
     int getDeviceFD(int& vid, int& pid, const std::vector<DevVIDPID>& allowedVidPids);
 }

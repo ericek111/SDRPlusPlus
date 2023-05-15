@@ -21,6 +21,7 @@ option(OPT_BUILD_PERSEUS_SOURCE "Build Perseus Source Module (Dependencies: libp
 option(OPT_BUILD_PLUTOSDR_SOURCE "Build PlutoSDR Source Module (Dependencies: libiio, libad9361)" ON)
 option(OPT_BUILD_RFSPACE_SOURCE "Build RFspace Source Module (no dependencies required)" ON)
 option(OPT_BUILD_RTL_SDR_SOURCE "Build RTL-SDR Source Module (Dependencies: librtlsdr)" ON)
+option(OPT_BUILD_MIRISDR_SOURCE "Build MiriSDR (MSI.001, MSI.2500) Source Module (Dependencies: libmirisdr)" OFF)
 option(OPT_BUILD_RTL_TCP_SOURCE "Build RTL-TCP Source Module (no dependencies required)" ON)
 option(OPT_BUILD_SDRPP_SERVER_SOURCE "Build SDR++ Server Source Module (no dependencies required)" ON)
 option(OPT_BUILD_SDRPLAY_SOURCE "Build SDRplay Source Module (Dependencies: libsdrplay)" OFF)
@@ -158,6 +159,10 @@ endif (OPT_BUILD_RFSPACE_SOURCE)
 if (OPT_BUILD_RTL_SDR_SOURCE)
 add_subdirectory("source_modules/rtl_sdr_source")
 endif (OPT_BUILD_RTL_SDR_SOURCE)
+
+if (OPT_BUILD_MIRISDR_SOURCE)
+add_subdirectory("source_modules/mirisdr_source")
+endif (OPT_BUILD_MIRISDR_SOURCE)
 
 if (OPT_BUILD_RTL_TCP_SOURCE)
 add_subdirectory("source_modules/rtl_tcp_source")
