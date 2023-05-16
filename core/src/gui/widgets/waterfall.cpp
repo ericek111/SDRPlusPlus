@@ -1059,22 +1059,6 @@ namespace ImGui {
         updateWaterfallFb();
     }
 
-    void WaterFall::autoRange() {
-        std::lock_guard<std::recursive_mutex> lck(latestFFTMtx);
-        float min = INFINITY;
-        float max = -INFINITY;
-        for (int i = 0; i < dataWidth; i++) {
-            if (latestFFT[i] < min) {
-                min = latestFFT[i];
-            }
-            if (latestFFT[i] > max) {
-                max = latestFFT[i];
-            }
-        }
-        fftMin = min - 5;
-        fftMax = max + 5;
-    }
-
     void WaterFall::getAutorangeValues(float& targetMin, float& targetMax) {
         std::lock_guard<std::recursive_mutex> lck(latestFFTMtx);
         float min = INFINITY;
