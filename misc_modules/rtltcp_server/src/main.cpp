@@ -1,3 +1,4 @@
+#include <utils/networking.h>
 #include <imgui.h>
 #include <config.h>
 #include <core.h>
@@ -6,7 +7,6 @@
 #include <signal_path/signal_path.h>
 #include <module.h>
 #include <fstream>
-#include <utils/networking.h>
 
 #include <dsp/demod/psk.h>
 #include <dsp/buffer/packer.h>
