@@ -68,7 +68,7 @@ public:
         }
         vfo = sigpath::vfoManager.createVFO(name, ImGui::WaterfallVFO::REF_CENTER, 0, 2400000, 2400000 /*sample rate*/, 0, 0, false);
 //        vfoSink.init(vfo->output, _vfoSinkHandler, this);
-        flog::info("data: {} {}", sizeof(writeBuffer), sizeof(writeBuffer[0]));
+        // flog::info("data: {} {}", sizeof(writeBuffer), sizeof(writeBuffer[0]));
         packer.init(vfo->output, writeBufSize / 2 / sizeof(writeBuffer[0]));
         hnd.init(&packer.out, _vfoSinkHandler, this);
         // vfoSink.start();
