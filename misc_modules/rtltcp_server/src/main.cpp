@@ -69,9 +69,6 @@ public:
     void postInit() {}
 
     void enable() {
-        if (this->isEnabled())
-            return;
-
         if (!this->startServer()) {
             enabled = false;
             return;
@@ -80,15 +77,13 @@ public:
 //        vfoSink.init(vfo->output, _vfoSinkHandler, this);
         // flog::info("data: {} {}", sizeof(writeBuffer), sizeof(writeBuffer[0]));
         // vfoSink.start();
+        packer.setInput(vfo->output);
         packer.start();
         hnd.start();
         enabled = true;
     }
 
     void disable() {
-        if (!this->isEnabled())
-            return;
-
         this->stopServer();
         hnd.stop();
         packer.stop();
