@@ -185,7 +185,6 @@ public:
         config.acquire();
         if (!config.conf["devices"].contains(serial)) {
             config.conf["devices"][serial]["sampleRate"] = 1540000;
-            config.conf["devices"][serial]["gain"] = 0;
             config.conf["devices"][serial]["bandwidth"] = 3;
         }
         config.release(created);
@@ -205,9 +204,23 @@ public:
                 }
             }
         }
-        if (config.conf["devices"][serial].contains("gain")) {
-            gain = config.conf["devices"][serial]["gain"];
+
+        if (config.conf["devices"][serial].contains("gain_lna")) {
+            gain_lna = config.conf["devices"][serial]["gain_lna"];
         }
+        if (config.conf["devices"][serial].contains("gain_mixer")) {
+            gain_mixer = config.conf["devices"][serial]["gain_mixer"];
+        }
+        if (config.conf["devices"][serial].contains("gain_mb")) {
+            gain_mb = config.conf["devices"][serial]["gain_mb"];
+        }
+        if (config.conf["devices"][serial].contains("gain_bb")) {
+            gain_bb = config.conf["devices"][serial]["gain_bb"];
+        }
+        if (config.conf["devices"][serial].contains("biasTee")) {
+            biasTee = config.conf["devices"][serial]["biasTee"];
+        }
+
         if (config.conf["devices"][serial].contains("bandwidth")) {
             bwId = config.conf["devices"][serial]["bandwidth"];
             bwId = std::clamp<int>(bwId, 0, 7);
@@ -294,12 +307,25 @@ private:
             flog::error("Could not set Mirisdr center freq {0}", _this->selectedSerial);
             return;
         }
-        if(mirisdr_set_tuner_gain_mode(_this->openDev, 1)) {
-            flog::error("Could not set Mirisdr gain mode {0}", _this->selectedSerial);
+
+        if(mirisdr_set_mixer_gain(_this->openDev, _this->gain_mixer)) {
+            flog::error("Could not set Mirisdr gain {0}", _this->selectedSerial);
             return;
         }
-        if(mirisdr_set_tuner_gain(_this->openDev, _this->gain)) {
+        if(mirisdr_set_lna_gain(_this->openDev, _this->gain_lna)) {
             flog::error("Could not set Mirisdr gain {0}", _this->selectedSerial);
+            return;
+        }
+        if(mirisdr_set_mixbuffer_gain(_this->openDev, _this->gain_mb)) {
+            flog::error("Could not set Mirisdr gain {0}", _this->selectedSerial);
+            return;
+        }
+        if(mirisdr_set_baseband_gain(_this->openDev, _this->gain_bb)) {
+            flog::error("Could not set Mirisdr gain {0}", _this->selectedSerial);
+            return;
+        }
+        if(mirisdr_set_bias(_this->openDev, _this->biasTee ? 1 : 0)) {
+            flog::error("Could not set Mirisdr biasTee {0}", _this->selectedSerial);
             return;
         }
 
@@ -312,6 +338,8 @@ private:
         _this->workerThread = std::thread(mirisdr_read_async, _this->openDev, callback, _this, 0, (_this->sampleRate/50)*sizeof(int16_t));
 
         _this->running = true;
+
+        _this->updateGains();
 
         flog::info("MirisdrSourceModule '{0}': Start!", _this->name);
     }
@@ -387,60 +415,113 @@ private:
             config.release(true);
         }
 
+        bool shouldUpdateGains = false;
+
+        if (!_this->running) { SmGui::BeginDisabled(); }
         SmGui::LeftLabel("Gain");
         SmGui::FillWidth();
-        if (SmGui::SliderInt(CONCAT("##_mirisdr_gain_", _this->name), &_this->gain, 0, 102)) {
+        int autoGain = 0;
+        if (_this->running) {
+            autoGain = mirisdr_get_tuner_gain(_this->openDev);
+        }
+
+        if (SmGui::SliderInt(CONCAT("##_mirisdr_gain_", _this->name), &autoGain, 0, 102)) {
             if (_this->running) {
-                mirisdr_set_tuner_gain(_this->openDev, _this->gain);
+                mirisdr_set_tuner_gain(_this->openDev, autoGain);
+            }
+            shouldUpdateGains = true;
+        }
+        if (!_this->running) { SmGui::EndDisabled(); }
+
+        float menuWidth, mixerCursorY;
+        if (!_this->serverMode) {
+            menuWidth = ImGui::GetContentRegionAvail().x;
+            mixerCursorY = ImGui::GetCursorPosY();
+        }
+
+        SmGui::LeftLabel("Mixer gain");
+        if (SmGui::Checkbox(CONCAT("##_mirisdr_mixergain_", _this->name), &_this->gain_mixer)) {
+            if (_this->running) {
+                if (mirisdr_set_mixer_gain(_this->openDev, _this->gain_mixer)) {
+                    flog::error("Could not set Mirisdr gain {0}", _this->selectedSerial);
+                }
+            }
+            shouldUpdateGains = true;
+        }
+
+        if (_this->serverMode) {
+            SmGui::FillWidth();
+        } else {
+            auto& style = ImGui::GetStyle();
+            ImGui::SetCursorPosY(mixerCursorY);
+            ImGui::SetCursorPosX(menuWidth - ImGui::CalcTextSize("LNA gain").x - ImGui::GetFrameHeight() - style.ItemInnerSpacing.x * 2);
+        }
+
+        SmGui::LeftLabel("LNA gain");
+        if (SmGui::Checkbox(CONCAT("##_mirisdr_lnagain_", _this->name), &_this->gain_lna)) {
+            if (_this->running) {
+                if (mirisdr_set_lna_gain(_this->openDev, _this->gain_lna)) {
+                    flog::error("Could not set Mirisdr gain {0}", _this->selectedSerial);
+                }
+            }
+            shouldUpdateGains = true;
+        }
+
+        SmGui::LeftLabel("Mixbuffer gain");
+        SmGui::FillWidth();
+        float tmp_mbGain = _this->gain_mb;
+        if (SmGui::SliderFloatWithSteps(CONCAT("##_mirisdr_mixbgain_", _this->name), &tmp_mbGain, 0, 18, 6, SmGui::FMT_STR_FLOAT_NO_DECIMAL)) {
+            _this->gain_mb = tmp_mbGain;
+            if (_this->running) {
+                if (mirisdr_set_mixbuffer_gain(_this->openDev, _this->gain_mb)) {
+                    flog::error("Could not set Mirisdr gain {0}", _this->selectedSerial);
+                }
+            }
+            shouldUpdateGains = true;
+        }
+
+        SmGui::LeftLabel("BB gain");
+        SmGui::FillWidth();
+        if (SmGui::SliderInt(CONCAT("##_mirisdr_bbgain_", _this->name), &_this->gain_bb, 0, 59)) {
+            if (_this->running) {
+                if (mirisdr_set_baseband_gain(_this->openDev, _this->gain_bb)) {
+                    flog::error("Could not set Mirisdr gain {0}", _this->selectedSerial);
+                }
+            }
+            shouldUpdateGains = true;
+        }
+
+        if (shouldUpdateGains) {
+            _this->updateGains();
+        }
+
+        SmGui::FillWidth();
+        if (SmGui::Checkbox(CONCAT("Bias-T##_mirisdr_biast_", _this->name), &_this->biasTee)) {
+            if (_this->running) {
+                mirisdr_set_bias(_this->openDev, _this->biasTee ? 1 : 0);
+                _this->biasTee = mirisdr_get_bias(_this->openDev) > 0;
             }
             config.acquire();
-            config.conf["devices"][_this->selectedSerial]["gain"] = (int)_this->gain;
+            config.conf["devices"][_this->selectedSerial]["biasTee"] = _this->biasTee;
             config.release(true);
         }
+    }
 
-        if(_this->running) {
-            SmGui::LeftLabel("Mixer Gain");
-            SmGui::FillWidth();
-            int mg = mirisdr_get_mixer_gain(_this->openDev);
-            if (SmGui::SliderInt(CONCAT("##_mirisdr_mixergain_", _this->name), &mg, 0, 1)) {
-                if (_this->running) {
-                    if(mirisdr_set_mixer_gain(_this->openDev, mg)) {
-                        flog::error("Could not set Mirisdr gain {0}", _this->selectedSerial);
-                    }
-                }
-            }
-            SmGui::LeftLabel("Mixbuffer Gain");
-            SmGui::FillWidth();
-            int mbg = mirisdr_get_mixbuffer_gain(_this->openDev);
-            if (SmGui::SliderInt(CONCAT("##_mirisdr_mixbgain_", _this->name), &mbg, 0, 3)) {
-                if (_this->running) {
-                    if(mirisdr_set_mixbuffer_gain(_this->openDev, mbg)) {
-                        flog::error("Could not set Mirisdr gain {0}", _this->selectedSerial);
-                    }
-                }
-            }
-            SmGui::LeftLabel("Lna Gain");
-            SmGui::FillWidth();
-            int lnag = mirisdr_get_lna_gain(_this->openDev);
-            if (SmGui::SliderInt(CONCAT("##_mirisdr_lnagain_", _this->name), &lnag, 0, 1)) {
-                if (_this->running) {
-                    if(mirisdr_set_lna_gain(_this->openDev, lnag)) {
-                        flog::error("Could not set Mirisdr gain {0}", _this->selectedSerial);
-                    }
-                }
-            }
-            SmGui::LeftLabel("BB Gain");
-            SmGui::FillWidth();
-            int bbg = mirisdr_get_baseband_gain(_this->openDev);
-            if (SmGui::SliderInt(CONCAT("##_mirisdr_bbgain_", _this->name), &bbg, 0, 59)) {
-                if (_this->running) {
-                    if(mirisdr_set_baseband_gain(_this->openDev, bbg)) {
-                        flog::error("Could not set Mirisdr gain {0}", _this->selectedSerial);
-                    }
-                }
-            }
-
+    void updateGains() {
+        if (this->running) {
+            this->gain_mixer = mirisdr_get_mixer_gain(this->openDev) > 0;
+            this->gain_lna = mirisdr_get_lna_gain(this->openDev) > 0;
+            this->gain_mb = mirisdr_get_mixbuffer_gain(this->openDev);
+            this->gain_bb = mirisdr_get_baseband_gain(this->openDev);
         }
+
+        config.acquire();
+        config.conf["devices"][this->selectedSerial]["gain_mixer"] = this->gain_mixer;
+        config.conf["devices"][this->selectedSerial]["gain_lna"] = this->gain_lna;
+        config.conf["devices"][this->selectedSerial]["gain_mb"] = this->gain_mb;
+        config.conf["devices"][this->selectedSerial]["gain_bb"] = this->gain_bb;
+        config.release(true);
+
     }
 
     static void callback(unsigned char *buf, uint32_t len, void *ctx) {
@@ -464,7 +545,15 @@ private:
     int devId = 0;
     int srId = 0;
     int bwId = 16;
-    int gain = 0;
+
+    bool gain_mixer = 0;
+    bool gain_lna = 0;
+    int gain_mb = 0;
+    int gain_bb = 0;
+    bool biasTee = false;
+
+    // TODO: Implement SetCursorPosX etc. in SmGui
+    bool serverMode = (bool)core::args["server"];
 
     std::vector<std::string> devList;
     std::vector<int> devIdxList;
