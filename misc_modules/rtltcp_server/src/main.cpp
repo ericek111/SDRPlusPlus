@@ -7,6 +7,8 @@
 #include <signal_path/signal_path.h>
 #include <module.h>
 #include <fstream>
+#include <cerrno>
+#include <clocale>
 
 #include <dsp/demod/psk.h>
 #include <dsp/buffer/packer.h>
@@ -48,13 +50,17 @@ public:
         port = config.conf[name]["port"];
         config.release(created);
 
+        vfo = sigpath::vfoManager.createVFO(name, ImGui::WaterfallVFO::REF_CENTER, 0, 2400000, 2400000 /*sample rate*/, 0, 0, false);
+        packer.init(vfo->output, writeBufSize / 2 / sizeof(writeBuffer[0]));
+        hnd.init(&packer.out, _vfoSinkHandler, this);
+
         this->enable();
 
         gui::menu.registerEntry(name, menuHandler, this, this);
     }
 
     ~RTLTCPServerModule() {
-        if(isEnabled()) {
+        if (this->isEnabled()) {
             disable();
         }
         gui::menu.removeEntry(name);
@@ -63,14 +69,16 @@ public:
     void postInit() {}
 
     void enable() {
+        if (this->isEnabled())
+            return;
+
         if (!this->startServer()) {
+            enabled = false;
             return;
         }
         vfo = sigpath::vfoManager.createVFO(name, ImGui::WaterfallVFO::REF_CENTER, 0, 2400000, 2400000 /*sample rate*/, 0, 0, false);
 //        vfoSink.init(vfo->output, _vfoSinkHandler, this);
         // flog::info("data: {} {}", sizeof(writeBuffer), sizeof(writeBuffer[0]));
-        packer.init(vfo->output, writeBufSize / 2 / sizeof(writeBuffer[0]));
-        hnd.init(&packer.out, _vfoSinkHandler, this);
         // vfoSink.start();
         packer.start();
         hnd.start();
@@ -78,6 +86,9 @@ public:
     }
 
     void disable() {
+        if (!this->isEnabled())
+            return;
+
         this->stopServer();
         hnd.stop();
         packer.stop();
@@ -132,16 +143,24 @@ private:
             listener->acceptAsync(clientHandler, this);
             return true;
         }
+        catch(const std::runtime_error& re) {
+            flog::error("Could not start RTL-TCP server listener: {}: {}", re.what(), std::strerror(errno));
+        }
         catch (std::exception e) {
-            flog::error("Could not start RTL-TCP server: {0}", e.what());
+            flog::error("Could not start RTL-TCP server: {}", e.what());
         }
 
         return false;
     }
 
     void stopServer() {
-        if (client) { client->close(); }
-        listener->close();
+        try {
+            if (client) { client->close(); }
+            if (listener) { listener->close(); }
+        }
+        catch (std::exception e) {
+            flog::error("Could not stop RTL-TCP server: {0}", e.what());
+        }
     }
 
     static void clientHandler(net::Conn _client, void* ctx) {
@@ -171,7 +190,7 @@ private:
     }
 
     void commandHandler(uint8_t cmd, uint32_t arg) {
-        flog::info("Command: {}   {}", cmd, arg);
+        // flog::info("Command: {}   {}", (int) cmd, (int) arg);
         std::lock_guard lck(vfoMtx);
         if (cmd == 1) {
             tuner::tune(tuner::TUNER_MODE_NORMAL, name, arg);
