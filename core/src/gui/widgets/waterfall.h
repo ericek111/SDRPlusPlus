@@ -95,39 +95,6 @@ namespace ImGui {
         float* getFFTBuffer();
         void pushFFT();
 
-        inline void doZoom(int offset, int width, int outWidth, float* data, float* out) {
-            // NOTE: REMOVE THAT SHIT, IT'S JUST A HACKY FIX
-            if (offset < 0) {
-                offset = 0;
-            }
-            if (width > 524288) {
-                width = 524288;
-            }
-
-            float* bufEnd = data + rawFFTSize;
-            double factor = (double)width / (double)outWidth; // The output "FFT" is `factor` times smaller than the input.
-            double id = offset;
-            for (int i = 0; i < outWidth; i++) {
-                // For each pixel on the output, "window" the source FFT datapoints (starting from `&data[(int) id]`
-                // and ending at `searchEnd = &data[(int) (id + factor)]`). Then find the highest peak in the range.
-                // The fractional part is discarded in the cast, so with zoomed-in view (`factor` < 1), pixels are "stretched".
-                // So with `factor` == 0.5, one pixel is `data[(int) 69]`, and the very next one is `data[(int) 69.5]`.
-                float* cursor = data + (int)id;
-                float* searchEnd = cursor + (int)factor;
-                if (searchEnd > bufEnd) { // This compiles into `cmp` and `cmovbe`, non-branching instructions.
-                    searchEnd = bufEnd;
-                }
-
-                float maxVal = *cursor;
-                while (cursor != searchEnd) {
-                    if (*cursor > maxVal) { maxVal = *cursor; }
-                    cursor++;
-                }
-                out[i] = maxVal;
-                id += factor;
-            }
-        }
-
         void updatePallette(float colors[][3], int colorCount);
         void updatePalletteFromArray(float* colors, int colorCount);
 
