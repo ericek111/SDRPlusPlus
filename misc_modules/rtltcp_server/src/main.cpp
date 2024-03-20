@@ -50,8 +50,7 @@ public:
         port = config.conf[name]["port"];
         config.release(created);
 
-        vfo = sigpath::vfoManager.createVFO(name, ImGui::WaterfallVFO::REF_CENTER, 0, 2400000, 2400000 /*sample rate*/, 0, 0, false);
-        packer.init(vfo->output, writeBufSize / 2 / sizeof(writeBuffer[0]));
+        packer.init(NULL, writeBufSize / 2 / sizeof(writeBuffer[0]));
         hnd.init(&packer.out, _vfoSinkHandler, this);
 
         this->enable();
@@ -70,13 +69,15 @@ public:
 
     void enable() {
         if (!this->startServer()) {
-            enabled = false;
             return;
         }
+
         vfo = sigpath::vfoManager.createVFO(name, ImGui::WaterfallVFO::REF_CENTER, 0, 2400000, 2400000 /*sample rate*/, 0, 0, false);
-//        vfoSink.init(vfo->output, _vfoSinkHandler, this);
-        // flog::info("data: {} {}", sizeof(writeBuffer), sizeof(writeBuffer[0]));
-        // vfoSink.start();
+        if (vfo == NULL) {
+            flog::error("Failed to create VFO '{}' for RTL-TCP server. Maybe another VFO with the same name already exists?", name);
+            return;
+        }
+
         packer.setInput(vfo->output);
         packer.start();
         hnd.start();
@@ -84,11 +85,16 @@ public:
     }
 
     void disable() {
+        if (!enabled) {
+            return;
+        }
+
         this->stopServer();
-        hnd.stop();
         packer.stop();
+        hnd.stop();
         // vfoSink.stop();
         sigpath::vfoManager.deleteVFO(vfo);
+        vfo = NULL;
         enabled = false;
     }
 
