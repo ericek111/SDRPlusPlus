@@ -7,6 +7,14 @@ namespace riff {
     const char* LIST_SIGNATURE      = "LIST";
     const size_t RIFF_LABEL_SIZE    = 4;
 
+    // Writer::Writer(const Writer&& b) {
+    //     //file = std::move(b.file);
+    // }
+
+    Writer::~Writer() {
+        close();
+    }
+
     bool Writer::open(std::string path, const char form[4]) {
         std::lock_guard<std::recursive_mutex> lck(mtx);
 
@@ -91,9 +99,9 @@ namespace riff {
         file.write((char*)&desc.hdr.size, sizeof(desc.hdr.size));
         file.seekp(pos);
 
-        // If parent chunk, increment its size
+        // If parent chunk, increment its size by the size of the sub-chunk plus the size of its header)
         if (!chunks.empty()) {
-            chunks.top().hdr.size += desc.hdr.size;
+            chunks.top().hdr.size += desc.hdr.size + sizeof(ChunkHeader);
         }
     }
 

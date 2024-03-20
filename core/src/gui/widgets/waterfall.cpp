@@ -663,74 +663,6 @@ namespace ImGui {
             }
             waterfallUpdate = true;
         }
-        delete[] workerZoomFFT;
-    }
-
-    double WaterFall::calculateStrongestSignal(double posRel) {
-        if (rawFFTs == NULL) {
-            return 0;
-        }
-
-        posRel = std::clamp(posRel, 0.0, 1.0);
-        float* rawFFT = &rawFFTs[currentFFTLine * rawFFTSize];
-
-        double wfAvg = 0.0;
-        double medWfAvg = 0.0;
-        for (size_t i = 0; i < rawFFTSize; i++) {
-            // iteratively calculate the mean of the FFT array
-            medWfAvg += ((double) rawFFT[i] - medWfAvg) / (i + 1);
-            wfAvg += (double) rawFFT[i];
-        }
-        wfAvg /= rawFFTSize;
-
-        // first see what's around us (10 % of bw)
-        int bigPeakIdx = calculateStrongestSignalIdx(posRel, 0.1);
-        float bigPeakSnr = rawFFT[bigPeakIdx] - wfAvg;
-
-        // then try in the immediate vicinity of the cursor
-        int smallPeakIdx = calculateStrongestSignalIdx(posRel, 0.02);
-        float smallPeakSnr = rawFFT[smallPeakIdx] - wfAvg;
-
-        // the close-by signal is reasonably strong
-        size_t foundIdx = smallPeakSnr > bigPeakSnr * 0.5 ? smallPeakIdx : bigPeakIdx;
-
-        return ((double) foundIdx / rawFFTSize);
-    }
-
-    size_t WaterFall::calculateStrongestSignalIdx(double posRel, double rangeRel) {
-        if (rawFFTs == NULL) {
-            return -1;
-        }
-
-        float* rawFFT = &rawFFTs[currentFFTLine * rawFFTSize];
-
-        // only search within the zoomed window
-        double wfRatio = (viewBandwidth / wholeBandwidth);
-        double offsetRatio = viewOffset / (wholeBandwidth / 2.0) + 1;
-        size_t drawDataSize = wfRatio * rawFFTSize;
-        size_t drawDataStart = (((double) rawFFTSize / 2.0) * offsetRatio) - (drawDataSize / 2);
-
-        // scale the search window accordingly
-        size_t rangeHalf = (rangeRel * drawDataSize) / 2.0;
-
-        size_t windowCenter = drawDataStart + (posRel * drawDataSize);
-        size_t lowerIdx = windowCenter - rangeHalf;
-        lowerIdx = std::max<size_t>(lowerIdx, drawDataStart);
-        lowerIdx = std::max<size_t>((size_t) 0, lowerIdx);
-        size_t upperIdx = windowCenter + rangeHalf;
-        upperIdx = std::min<size_t>(upperIdx, drawDataStart + drawDataSize);
-        upperIdx = std::min<size_t>((size_t) rawFFTSize - 1, upperIdx);
-
-        size_t maxIdx = 0;
-        float maxVal = -INFINITY;
-        for (size_t i = lowerIdx; i <= upperIdx; i++) {
-            if (rawFFT[i] > maxVal) {
-                maxVal = rawFFT[i];
-                maxIdx = i;
-            }
-        }
-
-        return maxIdx;
     }
 
     void WaterFall::drawBandPlan() {
@@ -1039,15 +971,22 @@ namespace ImGui {
         // Apply smoothing if enabled
         if (fftSmoothing && latestFFT != NULL && smoothingBuf != NULL && fftLines != 0) {
             std::lock_guard<std::mutex> lck2(smoothingBufMtx);
-            volk_32f_s32f_multiply_32f(latestFFT, latestFFT, smoothingAlpha, dataWidth);
-            volk_32f_s32f_multiply_32f(smoothingBuf, smoothingBuf, smoothingBeta, dataWidth);
+            volk_32f_s32f_multiply_32f(latestFFT, latestFFT, fftSmoothingAlpha, dataWidth);
+            volk_32f_s32f_multiply_32f(smoothingBuf, smoothingBuf, fftSmoothingBeta, dataWidth);
             volk_32f_x2_add_32f(smoothingBuf, latestFFT, smoothingBuf, dataWidth);
             memcpy(latestFFT, smoothingBuf, dataWidth * sizeof(float));
         }
 
         if (selectedVFO != "" && vfos.size() > 0) {
             float dummy;
-            calculateVFOSignalInfo(waterfallVisible ? &rawFFTs[currentFFTLine * rawFFTSize] : rawFFTs, vfos[selectedVFO], dummy, selectedVFOSNR);
+            if (snrSmoothing) {
+                float newSNR = 0.0f;
+                calculateVFOSignalInfo(waterfallVisible ? &rawFFTs[currentFFTLine * rawFFTSize] : rawFFTs, vfos[selectedVFO], dummy, newSNR);
+                selectedVFOSNR = (snrSmoothingBeta*selectedVFOSNR) + (snrSmoothingAlpha*newSNR);
+            }
+            else {
+                calculateVFOSignalInfo(waterfallVisible ? &rawFFTs[currentFFTLine * rawFFTSize] : rawFFTs, vfos[selectedVFO], dummy, selectedVFOSNR);
+            }
         }
 
         // If FFT hold is enabled, update it
@@ -1386,8 +1325,17 @@ namespace ImGui {
 
     void WaterFall::setFFTSmoothingSpeed(float speed) {
         std::lock_guard<std::mutex> lck(smoothingBufMtx);
-        smoothingAlpha = speed;
-        smoothingBeta = 1.0f - speed;
+        fftSmoothingAlpha = speed;
+        fftSmoothingBeta = 1.0f - speed;
+    }
+
+    void WaterFall::setSNRSmoothing(bool enabled) {
+        snrSmoothing = enabled;
+    }
+
+    void WaterFall::setSNRSmoothingSpeed(float speed) {
+        snrSmoothingAlpha = speed;
+        snrSmoothingBeta = 1.0f - speed;
     }
 
     float* WaterFall::acquireLatestFFT(int& width) {
