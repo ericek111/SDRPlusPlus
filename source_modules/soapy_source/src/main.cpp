@@ -81,8 +81,15 @@ public:
 
 private:
     void refresh() {
-        devList = SoapySDR::Device::enumerate();
         txtDevList = "";
+        try {
+            devList = SoapySDR::Device::enumerate();
+        }
+        catch (const std::exception& e) {
+            flog::error("Could not list devices: {}", e.what());
+            return;
+        }
+        
         int i = 0;
         for (auto& dev : devList) {
             txtDevList += dev["label"] != "" ? dev["label"] : dev["driver"];
