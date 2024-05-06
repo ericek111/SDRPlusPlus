@@ -843,12 +843,11 @@ namespace ImGui {
 
         int lastWaterfallHeight = waterfallHeight;
 
-        // Compute sizes
         if (waterfallVisible) {
             FFTAreaHeight = std::min<int>(FFTAreaHeight, widgetSize.y - (50.0f * style::uiScale));
             newFFTAreaHeight = FFTAreaHeight;
             fftHeight = FFTAreaHeight - (50.0f * style::uiScale);
-            waterfallHeight = std::max<int>(1, widgetSize.y - fftHeight - (50.0f * style::uiScale) - 2);
+            waterfallHeight = widgetSize.y - fftHeight - (50.0f * style::uiScale) - 2;
         }
         else {
             fftHeight = widgetSize.y - (50.0f * style::uiScale);
