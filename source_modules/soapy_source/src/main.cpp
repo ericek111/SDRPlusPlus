@@ -1,3 +1,4 @@
+#include <atomic>
 #include <SoapySDR/Constants.h>
 #include <imgui.h>
 #include <utils/flog.h>
